@@ -1,0 +1,2 @@
+# Force LF line endings on all platforms so prettier --check passes on Windows.
+* text=auto eol=lf
