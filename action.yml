@@ -1,0 +1,68 @@
+name: ActionRepro
+description: Turn a failed GitHub Actions run into a redacted local reproducibility bundle. No secrets are printed.
+author: ActionRepro contributors
+branding:
+  icon: repeat
+  color: green
+
+inputs:
+  run-url:
+    description: GitHub Actions run URL, e.g. https://github.com/OWNER/REPO/actions/runs/123
+    required: true
+  out:
+    description: Output directory for the bundle
+    required: false
+    default: actionrepro
+  run:
+    description: Execute reproduce.sh after generating ("true" or "false")
+    required: false
+    default: "false"
+  token:
+    description: GitHub token (defaults to secrets.GITHUB_TOKEN). Never printed.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  out-dir:
+    description: Bundle output directory
+    value: ${{ steps.repro.outputs.out-dir }}
+  summary:
+    description: Redacted one-line failure summary
+    value: ${{ steps.repro.outputs.summary }}
+  repro-command:
+    description: Redacted closest repro command
+    value: ${{ steps.repro.outputs.repro-command }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+    - name: Generate redacted repro bundle
+      id: repro
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        ACTIONREPRO_URL: ${{ inputs.run-url }}
+        ACTIONREPRO_OUT: ${{ inputs.out }}
+        ACTIONREPRO_RUN: ${{ inputs.run }}
+      run: |
+        set -euo pipefail
+        npx -y actionrepro@latest reproduce "$ACTIONREPRO_URL" --out "$ACTIONREPRO_OUT" --json > /tmp/actionrepro.json
+        # Extract redacted-only fields with node (no secrets echoed; the JSON itself is already redacted).
+        OUT_DIR=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/actionrepro.json','utf8')).outDir ?? '$ACTIONREPRO_OUT')")
+        SUMMARY=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/actionrepro.json','utf8')).summary ?? '')")
+        REPRO=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/actionrepro.json','utf8')).reproCommand ?? '')")
+        {
+          echo "out-dir=$OUT_DIR"
+          echo "summary=$SUMMARY"
+          echo "repro-command=$REPRO"
+        } >> "$GITHUB_OUTPUT"
+        echo "--- actionrepro summary (redacted) ---"
+        echo "$SUMMARY"
+        echo "repro: $REPRO"
+        if [ "$ACTIONREPRO_RUN" = "true" ]; then
+          bash "$OUT_DIR/reproduce.sh" || echo "reproduce script exited non-zero (expected when reproducing a failure)"
+        fi

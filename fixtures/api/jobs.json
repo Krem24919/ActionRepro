@@ -1,0 +1,26 @@
+{
+  "total_count": 2,
+  "jobs": [
+    {
+      "id": 111,
+      "run_id": 123456789,
+      "name": "build",
+      "conclusion": "success",
+      "status": "completed",
+      "runner_name": "GitHub Actions 11",
+      "steps": [{ "name": "Run npm ci", "conclusion": "success", "number": 1 }]
+    },
+    {
+      "id": 222,
+      "run_id": 123456789,
+      "name": "test",
+      "conclusion": "failure",
+      "status": "completed",
+      "runner_name": "GitHub Actions 12",
+      "steps": [
+        { "name": "Run npm ci", "conclusion": "success", "number": 1 },
+        { "name": "Run npm test", "conclusion": "failure", "number": 2 }
+      ]
+    }
+  ]
+}

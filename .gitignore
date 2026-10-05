@@ -1,0 +1,8 @@
+dist/
+node_modules/
+coverage/
+actionrepro/
+*.tgz
+.DS_Store
+*.log
+!.gitignore
