@@ -6,11 +6,11 @@
   "author": "ActionRepro contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/example/ActionRepro.git"
+    "url": "https://github.com/Krem24919/ActionRepro.git"
   },
-  "homepage": "https://github.com/example/ActionRepro#readme",
+  "homepage": "https://github.com/Krem24919/ActionRepro#readme",
   "bugs": {
-    "url": "https://github.com/example/ActionRepro/issues"
+    "url": "https://github.com/Krem24919/ActionRepro/issues"
   },
   "keywords": [
     "ci",

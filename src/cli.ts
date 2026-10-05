@@ -5,6 +5,7 @@ import { reproduceTarget } from "./commands/reproduce.js";
 import { doctor, formatDoctorHuman } from "./commands/doctor.js";
 import { VERSION } from "./utils/version.js";
 import { redactText } from "./core/redact.js";
+import { sanitizeActionsOutput } from "./utils/log.js";
 
 const program = new Command();
 program
@@ -21,10 +22,10 @@ program
     try {
       const r = await inspectTarget({ target, token: opts.token, json: opts.json });
       if (opts.json) console.log(JSON.stringify({ ok: true, ...r }, null, 2));
-      else console.log(formatInspectHuman(r));
+      else console.log(sanitizeActionsOutput(formatInspectHuman(r)));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`error: ${redactText(msg).text}`);
+      console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));
       process.exitCode = 1;
     }
   });
@@ -52,7 +53,7 @@ program
         else {
           console.log(`failure: ${safeOut(res.summary)}`);
           console.log(`ecosystem: ${res.ecosystem}`);
-          console.log(`repro command: ${res.reproCommand ?? "(none)"}`);
+          console.log(`repro command: ${safeOut(res.reproCommand ?? "(none)")}`);
           console.log(`bundle: ${res.outDir}/`);
           for (const f of res.files) console.log(`  - ${f}`);
           console.log(`redactions: ${res.redactions}`);
@@ -60,7 +61,7 @@ program
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`error: ${redactText(msg).text}`);
+        console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));
         process.exitCode = 1;
       }
     },
@@ -74,7 +75,7 @@ program
     const r = await doctor();
     if (opts.json) console.log(JSON.stringify({ ok: r.ok, checks: r.checks }, null, 2));
     else {
-      console.log(formatDoctorHuman(r));
+      console.log(sanitizeActionsOutput(formatDoctorHuman(r)));
       if (!r.ok) process.exitCode = 1;
     }
   });
@@ -113,19 +114,21 @@ async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
     } else {
       console.log(`failure: ${safeOut(res.summary)}`);
       console.log(`ecosystem: ${res.ecosystem}`);
-      console.log(`repro command: ${res.reproCommand ?? "(none)"}`);
+      console.log(`repro command: ${safeOut(res.reproCommand ?? "(none)")}`);
       console.log(`bundle: ${res.outDir}/`);
       for (const f of res.files) console.log(`  - ${f}`);
       console.log(`redactions: ${res.redactions}`);
       if (parsed.run) console.log(`reproduce exit code: ${res.exitCode ?? "?"}`);
       else
         console.log(
-          `tip: run ${displayScriptPath(res.outDir)}  (or: actionrepro reproduce "${parsed.target}" --run)`,
+          sanitizeActionsOutput(
+            `tip: run ${displayScriptPath(res.outDir)}  (or: actionrepro reproduce "${parsed.target}" --run)`,
+          ),
         );
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`error: ${redactText(msg).text}`);
+    console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));
     process.exitCode = 1;
   }
   return true;
@@ -171,7 +174,7 @@ function parseDefaultArgs(argv: string[]): {
 }
 
 function safeOut(s: string): string {
-  return redactText(s).text;
+  return sanitizeActionsOutput(redactText(s).text);
 }
 
 function stripDotSlash(p: string): string {
@@ -186,7 +189,9 @@ function displayScriptPath(outDir: string): string {
 
 // Avoid printing token if Node passes it through env in stack traces.
 process.on("uncaughtException", (e) => {
-  console.error(`error: ${redactText(String(e?.message ?? e)).text}`);
+  console.error(
+    sanitizeActionsOutput(`error: ${redactText(String(e?.message ?? e)).text}`),
+  );
   process.exit(1);
 });
 
@@ -201,6 +206,8 @@ async function main(): Promise<void> {
 }
 
 main().catch((e) => {
-  console.error(`error: ${redactText(String(e?.message ?? e)).text}`);
+  console.error(
+    sanitizeActionsOutput(`error: ${redactText(String(e?.message ?? e)).text}`),
+  );
   process.exit(1);
 });

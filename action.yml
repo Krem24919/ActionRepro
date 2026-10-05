@@ -61,8 +61,10 @@ runs:
           echo "repro-command=$REPRO"
         } >> "$GITHUB_OUTPUT"
         echo "--- actionrepro summary (redacted) ---"
-        echo "$SUMMARY"
-        echo "repro: $REPRO"
+        # Neutralize workflow-command markers (e.g. ##[error] inside failure
+        # text) so the runner never turns our output into phantom annotations.
+        echo "${SUMMARY//##\[/## [}"
+        echo "repro: ${REPRO//##\[/## [}"
         if [ "$ACTIONREPRO_RUN" = "true" ]; then
           bash "$OUT_DIR/reproduce.sh" || echo "reproduce script exited non-zero (expected when reproducing a failure)"
         fi

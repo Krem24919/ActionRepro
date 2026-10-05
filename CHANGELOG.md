@@ -20,6 +20,10 @@ All notable changes to this project will be documented in this file. Format foll
 - Documented that downloading Actions logs requires authentication even for
   public repos (verified live: unauthenticated log download returns
   `403 Must have admin rights`).
+- Sanitize `##[` workflow-command markers in human stdout (and in the
+  reusable action's echoed summary) so failure text copied from CI logs can
+  never be parsed by the runner into phantom failure annotations. `--json`
+  output and bundle files stay byte-identical.
 
 ## [0.1.0] - 2026-10-05
 

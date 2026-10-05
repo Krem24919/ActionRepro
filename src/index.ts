@@ -9,3 +9,4 @@ export { detectRuntime } from "./core/runtime.js";
 export { createBundle } from "./core/bundle.js";
 export { GitHubActionsProvider } from "./providers/github-actions.js";
 export { allLogsFailed, firstLogError } from "./core/github.js";
+export { sanitizeActionsOutput } from "./utils/log.js";
