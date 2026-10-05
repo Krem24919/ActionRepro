@@ -1,0 +1,12 @@
+2024-05-04T09:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-04T09:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-04T09:00:02.0000000Z ##[group]Run actions/setup-go@v5
+2024-05-04T09:00:02.0000000Z go version go1.22.2 linux/amd64
+2024-05-04T09:00:02.0000000Z ##[endgroup]
+2024-05-04T09:00:03.0000000Z ##[group]Run go test ./...
+2024-05-04T09:00:03.0000000Z Run go test ./...
+2024-05-04T09:00:05.0000000Z --- FAIL: TestAdd (0.00s)
+2024-05-04T09:00:05.0000000Z     add_test.go:10: got 3, want 4
+2024-05-04T09:00:05.0000000Z FAIL	example.com/myapp	0.010s
+2024-05-04T09:00:05.0000000Z FAIL
+2024-05-04T09:00:05.0000000Z ##[error]Process completed with exit code 1.

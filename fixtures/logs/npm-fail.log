@@ -1,0 +1,28 @@
+2024-05-01T10:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-01T10:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-01T10:00:01.0000000Z Runner name: GitHub Actions 12
+2024-05-01T10:00:02.0000000Z ##[group]Run actions/checkout@v4
+2024-05-01T10:00:03.0000000Z ##[endgroup]
+2024-05-01T10:00:04.0000000Z ##[group]Run actions/setup-node@v4
+2024-05-01T10:00:04.0000000Z Found in cache @ /opt/hostedtoolcache/node/20.12.1/x64
+2024-05-01T10:00:04.0000000Z ##[endgroup]
+2024-05-01T10:00:05.0000000Z ##[group]Run npm ci
+2024-05-01T10:00:05.0000000Z Run npm ci
+2024-05-01T10:00:10.0000000Z added 142 packages in 5s
+2024-05-01T10:00:10.0000000Z ##[endgroup]
+2024-05-01T10:00:11.0000000Z ##[group]Run npm test
+2024-05-01T10:00:11.0000000Z Run npm test
+2024-05-01T10:00:11.0000000Z > myapp@1.0.0 test
+2024-05-01T10:00:11.0000000Z > vitest run
+2024-05-01T10:00:12.0000000Z  ❯ src/add.test.ts (2 tests | 1 failed)
+2024-05-01T10:00:12.0000000Z    ❯ src/add.test.ts > adds numbers
+2024-05-01T10:00:12.0000000Z      → expected 3 to equal 4
+2024-05-01T10:00:12.0000000Z FAIL  src/add.test.ts > adds numbers
+2024-05-01T10:00:12.0000000Z AssertionError: expected 3 to equal 4
+2024-05-01T10:00:12.0000000Z  Test Files  1 failed (1)
+2024-05-01T10:00:12.0000000Z       Tests  1 failed | 1 passed (2)
+2024-05-01T10:00:12.0000000Z  npm ERR! code ELIFECYCLE
+2024-05-01T10:00:12.0000000Z  npm ERR! errno 1
+2024-05-01T10:00:12.0000000Z  npm ERR! myapp@1.0.0 test: `vitest run`
+2024-05-01T10:00:12.0000000Z  npm ERR! Exit status 1
+2024-05-01T10:00:12.0000000Z ##[error]Process completed with exit code 1.

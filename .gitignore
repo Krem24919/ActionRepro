@@ -5,4 +5,5 @@ actionrepro/
 *.tgz
 .DS_Store
 *.log
+!fixtures/logs/*.log
 !.gitignore

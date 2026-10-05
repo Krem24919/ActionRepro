@@ -1,0 +1,16 @@
+2024-05-06T09:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-06T09:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-06T09:00:02.0000000Z ##[group]Run actions/setup-node@v4
+2024-05-06T09:00:02.0000000Z Found in cache @ /opt/hostedtoolcache/node/20.12.1/x64
+2024-05-06T09:00:02.0000000Z ##[endgroup]
+2024-05-06T09:00:03.0000000Z ##[group]Run yarn install --frozen-lockfile
+2024-05-06T09:00:03.0000000Z Run yarn install --frozen-lockfile
+2024-05-06T09:00:08.0000000Z success Already up-to-date.
+2024-05-06T09:00:08.0000000Z ##[endgroup]
+2024-05-06T09:00:09.0000000Z ##[group]Run yarn test
+2024-05-06T09:00:09.0000000Z Run yarn test
+2024-05-06T09:00:10.0000000Z $ jest
+2024-05-06T09:00:10.0000000Z PASS src/add.test.js
+2024-05-06T09:00:10.0000000Z Test Suites: 1 passed, 1 total
+2024-05-06T09:00:10.0000000Z Tests:       2 passed, 2 total
+2024-05-06T09:00:10.0000000Z Done in 1.23s.

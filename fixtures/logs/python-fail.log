@@ -1,0 +1,22 @@
+2024-05-02T11:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-02T11:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-02T11:00:02.0000000Z ##[group]Run actions/setup-python@v5
+2024-05-02T11:00:02.0000000Z Successfully setup CPython (3.11.9)
+2024-05-02T11:00:02.0000000Z ##[endgroup]
+2024-05-02T11:00:03.0000000Z ##[group]Run python -m pip install -r requirements.txt
+2024-05-02T11:00:03.0000000Z Run python -m pip install -r requirements.txt
+2024-05-02T11:00:10.0000000Z Successfully installed pytest-8.2.0
+2024-05-02T11:00:10.0000000Z ##[endgroup]
+2024-05-02T11:00:11.0000000Z ##[group]Run pytest
+2024-05-02T11:00:11.0000000Z Run pytest
+2024-05-02T11:00:11.0000000Z ============================= test session starts ==============================
+2024-05-02T11:00:11.0000000Z collected 2 items
+2024-05-02T11:00:11.0000000Z tests/test_add.py .F                                                     [100%]
+2024-05-02T11:00:11.0000000Z =================================== FAILURES ===================================
+2024-05-02T11:00:11.0000000Z _______________________________ test_add_twice _______________________________
+2024-05-02T11:00:11.0000000Z Traceback (most recent call last):
+2024-05-02T11:00:11.0000000Z   File "/home/runner/work/repo/tests/test_add.py", line 9, in test_add_twice
+2024-05-02T11:00:11.0000000Z     assert add(add(1, 2), 3) == 7
+2024-05-02T11:00:11.0000000Z AssertionError: assert 6 == 7
+2024-05-02T11:00:11.0000000Z =========================== 1 failed, 1 passed in 0.21s ==========================
+2024-05-02T11:00:11.0000000Z ##[error]Process completed with exit code 1.

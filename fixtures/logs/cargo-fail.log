@@ -1,0 +1,15 @@
+2024-05-03T09:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-03T09:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-03T09:00:02.0000000Z ##[group]Run actions-rs/toolchain@v1
+2024-05-03T09:00:02.0000000Z rustc 1.78.0 (9b0091c21 2024-04-29)
+2024-05-03T09:00:02.0000000Z ##[endgroup]
+2024-05-03T09:00:03.0000000Z ##[group]Run cargo test
+2024-05-03T09:00:03.0000000Z Run cargo test
+2024-05-03T09:00:05.0000000Z    Compiling myapp v0.1.0 (/home/runner/work/repo)
+2024-05-03T09:00:06.0000000Z error[E0308]: mismatched types
+2024-05-03T09:00:06.0000000Z   --> src/main.rs:12:5
+2024-05-03T09:00:06.0000000Z    |
+2024-05-03T09:00:06.0000000Z 12 |     "hello"
+2024-05-03T09:00:06.0000000Z    |     ^^^^^^^ expected `i32`, found `&str`
+2024-05-03T09:00:06.0000000Z error: could not compile `myapp` due to previous error
+2024-05-03T09:00:06.0000000Z ##[error]Process completed with exit code 101.
