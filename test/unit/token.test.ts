@@ -55,7 +55,14 @@ describe("resolveToken", () => {
     });
   });
 
-  it("falls back to the gh CLI when no env token exists", () => {
+  // Positive gh-fallback tests need an executable `gh` stub. A shell-script
+  // stub works on POSIX but not on Windows (extensionless files are not
+  // executable there; the real gh.exe resolves fine). The parsing/validation
+  // logic is platform-independent and covered on all platforms by the
+  // negative tests below.
+  const itPosix = process.platform === "win32" ? it.skip : it;
+
+  itPosix("falls back to the gh CLI when no env token exists", () => {
     const dir = stubGh(["printf '%s' 'ghp_faketoken123'"]);
     withPath(dir);
     expect(resolveTokenWithSource()).toMatchObject({
@@ -72,7 +79,7 @@ describe("resolveToken", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it("rejects multiline gh output", () => {
+  itPosix("rejects multiline gh output", () => {
     const dir = stubGh(["printf 'line1\\nline2\\n'"]);
     withPath(dir);
     expect(resolveToken()).toBeUndefined();
