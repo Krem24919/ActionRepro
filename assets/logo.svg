@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="ActionRepro logo">
   <rect x="8" y="8" width="240" height="240" rx="56" fill="#0d1117" stroke="#30363d" stroke-width="4"/>
-  <!-- replay arrow -->
-  <path d="M 128 66 A 62 62 0 1 1 66 128" fill="none" stroke="#58a6ff" stroke-width="14" stroke-linecap="round"/>
-  <polygon points="66,104 54,132 82,130" fill="#58a6ff"/>
-  <!-- terminal prompt -->
-  <text x="128" y="150" text-anchor="middle" dominant-baseline="central" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="64" font-weight="bold" fill="#3fb950">&gt;_</text>
+  <!-- replay loop -->
+  <path d="M 128 58 A 70 70 0 1 1 58 128" fill="none" stroke="#58a6ff" stroke-width="18" stroke-linecap="round"/>
+  <polygon points="58,104 46,132 70,132" fill="#58a6ff"/>
+  <!-- terminal chevron -->
+  <path d="M 109 94 L 147 128 L 109 162" fill="none" stroke="#3fb950" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
