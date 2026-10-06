@@ -1,7 +1,7 @@
 # ActionRepro
 
 <p align="center">
-  <img src="assets/logo.svg" alt="ActionRepro logo" width="128" />
+  <img src="assets/logo.svg?v=2" alt="ActionRepro logo" width="128" />
 </p>
 
 > Repository: https://github.com/Krem24919/ActionRepro

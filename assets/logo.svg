@@ -1,8 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="ActionRepro logo">
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="#0d1117" stroke="#30363d" stroke-width="4"/>
-  <!-- replay loop -->
-  <path d="M 128 58 A 70 70 0 1 1 58 128" fill="none" stroke="#58a6ff" stroke-width="18" stroke-linecap="round"/>
-  <polygon points="58,104 46,132 70,132" fill="#58a6ff"/>
-  <!-- terminal chevron -->
-  <path d="M 109 94 L 147 128 L 109 162" fill="none" stroke="#3fb950" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="loop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#3fb950"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161b22"/>
+      <stop offset="1" stop-color="#0d1117"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)" stroke="#30363d" stroke-width="4"/>
+  <!-- retry loop: blue fades into green -->
+  <path d="M 128 62 A 66 66 0 1 1 62 128" fill="none" stroke="url(#loop)" stroke-width="20" stroke-linecap="round"/>
+  <polygon points="62,104 50,132 74,132" fill="#3fb950"/>
+  <!-- reproduced: bold check -->
+  <path d="M 99 130 L 121 152 L 157 104" fill="none" stroke="#3fb950" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
