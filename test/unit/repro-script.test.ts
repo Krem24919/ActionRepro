@@ -6,6 +6,7 @@ import {
   psDq,
 } from "../../src/core/bundle.js";
 import { extractFailure, findReproCommand } from "../../src/core/extract.js";
+import { fingerprintFailure } from "../../src/core/fingerprint.js";
 import type { BundleInput } from "../../src/core/bundle.js";
 
 function inputFor(reproCommand: string, summary = "Failure: boom"): BundleInput {
@@ -23,6 +24,11 @@ function inputFor(reproCommand: string, summary = "Failure: boom"): BundleInput 
     failure: { summary, errorLines: ["boom"], reproCommand, hint: "h" },
     redactedLogs: "boom",
     redactions: 0,
+    fingerprint: fingerprintFailure({
+      ecosystem: "npm",
+      reproCommand,
+      errorLines: ["boom"],
+    }),
   };
 }
 

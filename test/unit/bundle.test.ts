@@ -7,6 +7,7 @@ import { extractFailure } from "../../src/core/extract.js";
 import { detectEcosystem } from "../../src/core/ecosystems.js";
 import { detectRuntime } from "../../src/core/runtime.js";
 import { createBundle } from "../../src/core/bundle.js";
+import { fingerprintFailure } from "../../src/core/fingerprint.js";
 
 const fx = (n: string) =>
   fs.readFileSync(path.join(process.cwd(), "fixtures/logs", n), "utf8");
@@ -28,6 +29,12 @@ describe("createBundle", () => {
         failure,
         redactedLogs: red.text,
         redactions: red.redactions,
+        fingerprint: fingerprintFailure({
+          ecosystem: eco.id,
+          reproCommand: failure.reproCommand,
+          exitCode: failure.exitCode,
+          errorLines: failure.errorLines,
+        }),
       },
       out,
     );
@@ -49,6 +56,16 @@ describe("createBundle", () => {
     // Run-first layout: usage comes before source details and file list.
     expect(readme.indexOf("## Run this first")).toBeLessThan(readme.indexOf("## Source"));
     expect(readme.indexOf("## Source")).toBeLessThan(readme.indexOf("## Files"));
+    // Bundle identity: sha file exists, repro.json carries the fingerprint.
+    expect(names).toContain("bundle.sha256");
+    const sha = fs.readFileSync(path.join(out, "bundle.sha256"), "utf8");
+    expect(sha).toMatch(/^[0-9a-f]{64}$/m);
+    const meta = JSON.parse(fs.readFileSync(path.join(out, "repro.json"), "utf8")) as {
+      fingerprint?: string;
+      bundleSha256?: string;
+    };
+    expect(meta.fingerprint).toMatch(/^[0-9a-f]{16}$/);
+    expect(meta.bundleSha256).toMatch(/^[0-9a-f]{64}$/);
     fs.rmSync(out, { recursive: true, force: true });
   });
 
@@ -65,6 +82,7 @@ describe("createBundle", () => {
         failure: extractFailure(lines),
         redactedLogs: red.text,
         redactions: red.redactions,
+        fingerprint: "test-fingerprint",
       },
       out,
     );

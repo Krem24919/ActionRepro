@@ -1,5 +1,6 @@
 export { inspectTarget, formatInspectHuman } from "./commands/inspect.js";
 export { reproduceTarget } from "./commands/reproduce.js";
+export { verifyBundle, formatVerifyHuman } from "./commands/verify.js";
 export { doctor, formatDoctorHuman } from "./commands/doctor.js";
 export { parseGitHubRunUrl, isGitHubRunUrl } from "./core/url.js";
 export { redactText } from "./core/redact.js";
@@ -16,3 +17,12 @@ export {
 } from "./core/github.js";
 export type { TokenSource } from "./core/github.js";
 export { sanitizeActionsOutput } from "./utils/log.js";
+export {
+  fingerprintFailure,
+  compareFingerprints,
+  hashBundleFiles,
+  normalizeFailureLine,
+  FINGERPRINT_ALGO,
+} from "./core/fingerprint.js";
+export type { VerifyVerdict } from "./core/fingerprint.js";
+export { extractStepScript, commandsAgree } from "./core/workflow.js";

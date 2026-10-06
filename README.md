@@ -95,6 +95,10 @@ actionrepro inspect ./failure.log
 actionrepro reproduce ./failure.log --out ./actionrepro
 actionrepro reproduce <RUN_URL> --out ./actionrepro --run
 
+# Verify a local re-run against the recorded CI fingerprint
+actionrepro verify ./actionrepro ./local-run.log [--json]
+# verdict: REPRODUCED (exit 0), NOT_REPRODUCED (exit 1), INCONCLUSIVE (exit 2)
+
 # Check toolchains / network / token
 actionrepro doctor
 actionrepro doctor --json
@@ -142,6 +146,14 @@ Authentication notes (verified against the live GitHub API):
 | `failure.txt`     | Redacted failure excerpt + error context                          |
 | `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint             |
 | `repro.json`      | Machine-readable redacted metadata                                |
+| `bundle.sha256`   | Integrity hash over the bundle content files                      |
+
+Each bundle also records a **failure fingerprint** (stable hash of ecosystem,
+command, exit code, and normalized error lines) and, for GitHub URLs, the
+**workflow file at the exact run SHA** with a best-effort check whether the
+CI-defined step command agrees with the log evidence. `verify` compares a
+fresh local log against the recorded fingerprint — no probabilities, just
+match / differ / unreadable.
 
 The script is ecosystem-aware:
 

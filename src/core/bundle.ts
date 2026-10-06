@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ensureDir } from "../utils/fs.js";
 import { redactText } from "./redact.js";
+import { hashBundleFiles } from "./fingerprint.js";
 import type { EcosystemInfo } from "./ecosystems.js";
 import type { FailureInfo } from "./extract.js";
 import type { RuntimeInfo } from "./runtime.js";
@@ -15,6 +16,16 @@ export interface BundleInput {
   failure: FailureInfo;
   redactedLogs: string;
   redactions: number;
+  /** Stable identity of this exact failure (see fingerprint.ts). */
+  fingerprint: string;
+  /** Workflow definition cross-check (URL mode, best-effort, may be absent). */
+  workflow?: {
+    path: string;
+    sha: string;
+    stepCommand?: string;
+    /** true = CI definition agrees with log evidence, false = conflict, null = unknown. */
+    agree: boolean | null;
+  };
   runMeta?: {
     workflow?: string;
     branch?: string;
@@ -324,13 +335,13 @@ aborted at the prompt, anything else = the repro command's own exit code.
 ## Source
 
 - Input: \`${input.sourceDisplay}\`
-${input.sourceUrl ? `- Run: ${input.sourceUrl}\n` : ""}${meta?.workflow ? `- Workflow: ${meta.workflow}\n` : ""}${meta?.job ? `- Failing job: ${meta.job}\n` : ""}${meta?.branch ? `- Branch: ${meta.branch}\n` : ""}${meta?.sha ? `- SHA: \`${meta.sha}\`\n` : ""}
+${input.sourceUrl ? `- Run: ${input.sourceUrl}\n` : ""}${meta?.workflow ? `- Workflow: ${meta.workflow}\n` : ""}${meta?.job ? `- Failing job: ${meta.job}\n` : ""}${meta?.branch ? `- Branch: ${meta.branch}\n` : ""}${meta?.sha ? `- SHA: \`${meta.sha}\`\n` : ""}${input.workflow ? `- Workflow file: \`${input.workflow.path}\` @ \`${input.workflow.sha.slice(0, 12)}\`\n` : ""}- Failure fingerprint: \`${input.fingerprint}\`
 ## Failure
 
 > ${singleLine(input.failure.summary)}
 
 ${input.failure.failingStep ? `- Failing step: \`${input.failure.failingStep}\`\n` : ""}${input.failure.exitCode !== undefined ? `- Exit code: \`${input.failure.exitCode}\`\n` : ""}- Closest repro command: \`${reproCommandFor(input.ecosystem, input.failure)}\`
-- Hint: ${input.failure.hint}
+${input.workflow && input.workflow.agree === false ? `- Command check: CI workflow defines a different command — see \`repro.json\` → \`workflow.stepCommand\` (log evidence may show a wrapper or a later step)\n` : ""}- Hint: ${input.failure.hint}
 
 <details><summary>Error context (redacted)</summary>
 
@@ -360,6 +371,7 @@ No Docker required. No telemetry. Secrets were redacted heuristically (${input.r
 - \`failure.txt\` — redacted failure excerpt + full error context
 - \`environment.txt\` — CI runner/runtime details
 - \`repro.json\` — machine-readable metadata (redacted)
+- \`bundle.sha256\` — integrity hash over the content files
 - \`README.md\` — this file
 `;
 }
@@ -413,6 +425,16 @@ export function createBundle(input: BundleInput, outDir: string): BundleResult {
   const readme = buildBundleReadme(input);
   const failure = buildFailureTxt(input);
   const envTxt = buildEnvironmentTxt(input);
+  // Integrity hash covers the content files. repro.json is excluded on
+  // purpose: it carries this hash, so including it would be circular.
+  // (Redaction is idempotent on already-redacted content, so the hash also
+  // matches the bytes on disk after the final safety pass in write().)
+  const bundleSha256 = hashBundleFiles([
+    { name: "reproduce.sh", content: sh },
+    { name: "reproduce.ps1", content: ps1 },
+    { name: "failure.txt", content: failure },
+    { name: "environment.txt", content: envTxt },
+  ]);
   const meta = {
     tool: "actionrepro",
     source: input.sourceDisplay,
@@ -420,6 +442,9 @@ export function createBundle(input: BundleInput, outDir: string): BundleResult {
     ecosystem: input.ecosystem.id,
     ecosystemConfidence: input.ecosystem.confidence,
     evidence: input.ecosystem.evidence,
+    fingerprint: input.fingerprint,
+    bundleSha256,
+    workflow: input.workflow ?? null,
     failure: {
       summary: singleLine(input.failure.summary),
       failingJob: input.failure.failingJob ?? input.runMeta?.job ?? null,
@@ -454,6 +479,10 @@ export function createBundle(input: BundleInput, outDir: string): BundleResult {
   write("failure.txt", failure);
   write("environment.txt", envTxt);
   write("repro.json", JSON.stringify(meta, null, 2) + "\n");
+  write(
+    "bundle.sha256",
+    `# actionrepro bundle integrity: sha256 over reproduce.sh, reproduce.ps1,\n# failure.txt and environment.txt (sorted by name, in that framing).\n${bundleSha256}\nreproduce.sh\nreproduce.ps1\nfailure.txt\nenvironment.txt\n`,
+  );
 
   void path;
   return { outDir, files };

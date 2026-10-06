@@ -197,6 +197,46 @@ export async function fetchJobLogsById(
   return getText(`${API_BASE}/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, token);
 }
 
+export interface WorkflowFile {
+  path: string;
+  sha: string;
+  text: string;
+}
+
+/**
+ * Fetch the workflow YAML at the exact head SHA of a run. Best-effort:
+ * returns null on any failure (private repo without token, deleted file,
+ * API hiccup). Never throws, never prints secrets.
+ */
+export async function fetchWorkflowFile(
+  owner: string,
+  repo: string,
+  runId: string,
+  headSha: string,
+  token?: string,
+): Promise<WorkflowFile | null> {
+  try {
+    const run = (await getJson(
+      `${API_BASE}/repos/${owner}/${repo}/actions/runs/${runId}`,
+      token,
+    )) as { workflow_url?: string };
+    if (!run.workflow_url) return null;
+    const workflow = (await getJson(run.workflow_url, token)) as { path?: string };
+    if (!workflow.path) return null;
+    const file = (await getJson(
+      `${API_BASE}/repos/${owner}/${repo}/contents/${workflow.path}?ref=${headSha}`,
+      token,
+    )) as { content?: string; sha?: string; type?: string };
+    if (file.type && file.type !== "file") return null;
+    if (!file.content) return null;
+    const text = Buffer.from(file.content.replace(/\s/g, ""), "base64").toString("utf8");
+    if (!text.trim()) return null;
+    return { path: workflow.path, sha: file.sha ?? headSha, text };
+  } catch {
+    return null;
+  }
+}
+
 export interface RunBundle {
   run: GitHubRun;
   jobs: GitHubJob[];

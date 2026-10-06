@@ -4,12 +4,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createBundle } from "../../src/core/bundle.js";
+import { fingerprintFailure } from "../../src/core/fingerprint.js";
 import type { BundleInput } from "../../src/core/bundle.js";
 
 let tmp = "";
 let stubBin = "";
 
 function bundleInput(reproCommand: string, summary = "Failure: boom"): BundleInput {
+  const failure = { summary, errorLines: ["boom"], reproCommand, hint: "h" };
   return {
     sourceDisplay: "fixtures/logs/x.log",
     ecosystem: {
@@ -21,9 +23,14 @@ function bundleInput(reproCommand: string, summary = "Failure: boom"): BundleInp
       runHint: "h",
     },
     runtime: {},
-    failure: { summary, errorLines: ["boom"], reproCommand, hint: "h" },
+    failure,
     redactedLogs: "boom",
     redactions: 0,
+    fingerprint: fingerprintFailure({
+      ecosystem: "npm",
+      reproCommand,
+      errorLines: failure.errorLines,
+    }),
   };
 }
 

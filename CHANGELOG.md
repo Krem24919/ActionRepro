@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+- `actionrepro verify <bundle> <logfile>`: compares a fresh local log against
+  the bundle's recorded failure fingerprint and reports REPRODUCED /
+  NOT_REPRODUCED / INCONCLUSIVE (exits 0/1/2). No probabilities, no guessing.
+- Failure fingerprints (stable sha256 over ecosystem, command, exit code, and
+  normalized error lines) recorded in every bundle, plus `bundle.sha256`
+  integrity hashes over the bundle content files.
+- Workflow cross-check for GitHub URLs: the workflow file is fetched at the
+  exact run SHA and the CI-defined step command is compared against the log
+  evidence (match / conflict / unknown), recorded in `repro.json`.
+
 ## [0.1.1] - 2026-10-06
 
 ### Added

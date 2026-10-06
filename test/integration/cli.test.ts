@@ -58,6 +58,45 @@ describe("CLI integration (local fixtures, no network)", () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
+  it("verify reports REPRODUCED for the same log", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-verify-"));
+    const outDir = path.join(tmp, "bundle");
+    runCli(["reproduce", fx("npm-fail.log"), "--out", outDir]);
+    const out = runCli(["verify", outDir, fx("npm-fail.log")]);
+    expect(out).toMatch(/verdict: REPRODUCED/);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("verify reports NOT_REPRODUCED for a different failure", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-verify2-"));
+    const outDir = path.join(tmp, "bundle");
+    runCli(["reproduce", fx("npm-fail.log"), "--out", outDir]);
+    try {
+      runCli(["verify", outDir, fx("go-fail.log")]);
+      expect.unreachable("mismatch should exit 1");
+    } catch (e) {
+      const err = e as { status?: number; stdout?: unknown };
+      expect(err.status).toBe(1);
+      expect(String(err.stdout ?? "")).toMatch(/verdict: NOT_REPRODUCED/);
+    }
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("verify is inconclusive for a missing bundle", () => {
+    try {
+      runCli(["verify", "/nonexistent-bundle-xyz", fx("npm-fail.log")]);
+      expect.unreachable("should have failed");
+    } catch (e) {
+      const err = e as { status?: number };
+      expect(err.status).not.toBe(0);
+    }
+  });
+
+  it("routes the verify subcommand (not the default shorthand)", () => {
+    const out = runCli(["verify", "--help"]);
+    expect(out).toMatch(/REPRODUCED/);
+  });
+
   it("doctor passes required checks", () => {
     const out = runCli(["doctor"]);
     expect(out).toMatch(/doctor:/);

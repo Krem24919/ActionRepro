@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { inspectTarget, formatInspectHuman } from "./commands/inspect.js";
 import { reproduceTarget } from "./commands/reproduce.js";
+import { verifyBundle, formatVerifyHuman } from "./commands/verify.js";
 import { doctor, formatDoctorHuman } from "./commands/doctor.js";
 import { VERSION } from "./utils/version.js";
 import { redactText } from "./core/redact.js";
@@ -82,24 +83,38 @@ program
     }
   });
 
+program
+  .command("verify <bundle> <logfile>")
+  .description(
+    "Compare a fresh local log against a bundle fingerprint: REPRODUCED, NOT_REPRODUCED, or INCONCLUSIVE.",
+  )
+  .option("--json", "print machine-readable JSON", false)
+  .action(async (bundle: string, logfile: string, opts: { json: boolean }) => {
+    try {
+      const r = await verifyBundle({ bundleDir: bundle, logFile: logfile });
+      if (opts.json) console.log(JSON.stringify({ ok: true, ...r }, null, 2));
+      else {
+        console.log(sanitizeActionsOutput(formatVerifyHuman(r)));
+        process.exitCode =
+          r.verdict === "REPRODUCED" ? 0 : r.verdict === "NOT_REPRODUCED" ? 1 : 2;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));
+      process.exitCode = 1;
+    }
+  });
+
 // Default shorthand: `actionrepro <url|file> [--out dir] [--run] [--token T] [--json]`
 // Handled manually (not via commander program-action) because a program-level
 // action+options breaks subcommand option parsing in commander.
+// IMPORTANT: every `program.command(...)` name below MUST also appear in
+// KNOWN_SUBCOMMANDS, or the shorthand dispatcher will swallow it as a target.
+const KNOWN_SUBCOMMANDS = ["inspect", "reproduce", "doctor", "verify"];
 async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
   const first = argv[0];
   if (!first) return false;
-  if (
-    [
-      "inspect",
-      "reproduce",
-      "doctor",
-      "help",
-      "-h",
-      "--help",
-      "-V",
-      "--version",
-    ].includes(first)
-  ) {
+  if ([...KNOWN_SUBCOMMANDS, "help", "-h", "--help", "-V", "--version"].includes(first)) {
     return false;
   }
   if (first.startsWith("-")) return false;

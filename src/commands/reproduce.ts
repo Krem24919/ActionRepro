@@ -9,7 +9,15 @@ import { detectEcosystem } from "../core/ecosystems.js";
 import { detectRuntime } from "../core/runtime.js";
 import { createBundle } from "../core/bundle.js";
 import { runReproduceScript } from "../core/runner.js";
-import { allLogsFailed, firstLogError, resolveToken } from "../core/github.js";
+import {
+  allLogsFailed,
+  firstLogError,
+  resolveToken,
+  fetchWorkflowFile,
+} from "../core/github.js";
+import { fingerprintFailure } from "../core/fingerprint.js";
+import { extractStepScript, commandsAgree } from "../core/workflow.js";
+import type { BundleInput } from "../core/bundle.js";
 import type { CiFetchResult } from "../providers/types.js";
 
 function failingJobFrom(fetched: CiFetchResult): string | undefined {
@@ -52,6 +60,7 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
     const failure = extractFailure(lines);
     const eco = detectEcosystem(lines, localProjectFiles());
     const runtime = detectRuntime(lines);
+    const reproCommand = failure.reproCommand ?? eco.testCommand;
     const bundle = createBundle(
       {
         sourceDisplay: opts.target,
@@ -60,6 +69,12 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
         failure,
         redactedLogs: red.text,
         redactions: red.redactions,
+        fingerprint: fingerprintFailure({
+          ecosystem: eco.id,
+          reproCommand,
+          exitCode: failure.exitCode,
+          errorLines: failure.errorLines,
+        }),
       },
       outDir,
     );
@@ -69,7 +84,7 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
       outDir,
       files: bundle.files,
       summary: failure.summary,
-      reproCommand: failure.reproCommand ?? eco.testCommand,
+      reproCommand,
       ecosystem: eco.id,
       redactions: red.redactions,
       exitCode,
@@ -105,6 +120,27 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
   const failure = extractFailure(lines, { failingJob, failingStep });
   const eco = detectEcosystem(lines, localProjectFiles());
   const runtime = detectRuntime(lines);
+  const reproCommand = failure.reproCommand ?? eco.testCommand;
+  // Best-effort cross-check against the workflow definition at the exact SHA.
+  let workflow: BundleInput["workflow"];
+  if (fetched.run.headSha && failingStep) {
+    const wf = await fetchWorkflowFile(
+      parsed.owner,
+      parsed.repo,
+      parsed.runId,
+      fetched.run.headSha,
+      token,
+    );
+    if (wf) {
+      const step = extractStepScript(wf.text, failingStep);
+      workflow = {
+        path: wf.path,
+        sha: wf.sha,
+        stepCommand: step?.script,
+        agree: step ? commandsAgree(step.script, reproCommand) : null,
+      };
+    }
+  }
   const runMeta = {
     workflow: fetched.run.workflowName ?? fetched.run.name,
     branch: fetched.run.headBranch,
@@ -125,6 +161,13 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
       },
       redactedLogs: red.text,
       redactions: red.redactions,
+      fingerprint: fingerprintFailure({
+        ecosystem: eco.id,
+        reproCommand,
+        exitCode: failure.exitCode,
+        errorLines: failure.errorLines,
+      }),
+      workflow,
       runMeta,
     },
     outDir,
@@ -135,7 +178,7 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
     outDir,
     files: bundle.files,
     summary: failure.summary,
-    reproCommand: failure.reproCommand ?? eco.testCommand,
+    reproCommand,
     ecosystem: eco.id,
     redactions: red.redactions,
     exitCode,
