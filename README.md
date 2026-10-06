@@ -75,9 +75,9 @@ npm install -g .
 actionrepro --help
 ```
 
-> The `actionrepro` package is not on npm yet (checked 2026-10-06), so
-> `npx actionrepro` does not resolve today. After the first publish it
-> becomes a one-liner: `npx actionrepro@latest ./failure.log`.
+> Distribution is source-only by design — there is no registry package
+> and none is planned. Clone, build, and optionally `npm install -g .`
+> to put `actionrepro` on your PATH.
 
 Termux (from source):
 
@@ -263,7 +263,7 @@ jobs:
 ```
 
 The composite action (`action.yml`) builds itself from the pinned tag's
-source (no npm publish required), runs `reproduce --json` with redaction,
+source (self-contained — no registry package involved), runs `reproduce --json` with redaction,
 and uploads `actionrepro/` as an artifact. It never prints `GITHUB_TOKEN`
 and never posts raw logs. Pass `run-url` for a run, or `log-file` (a path
 in your checkout) for a saved log — see [action.yml](action.yml). Our own

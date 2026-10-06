@@ -49,7 +49,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        # No npm publish required: the pinned action tag carries its own source.
+        # Self-contained: the pinned action tag carries and builds its own source.
         cd "${{ github.action_path }}"
         npm ci
         npm run build
