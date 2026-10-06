@@ -6,7 +6,7 @@ import { redactText } from "../core/redact.js";
 import { extractFailure } from "../core/extract.js";
 import { detectEcosystem } from "../core/ecosystems.js";
 import { detectRuntime } from "../core/runtime.js";
-import { allLogsFailed, firstLogError } from "../core/github.js";
+import { allLogsFailed, firstLogError, resolveToken } from "../core/github.js";
 import type { CiFetchResult } from "../providers/types.js";
 
 function failingStepOf(fetched: CiFetchResult): string | undefined {
@@ -48,8 +48,7 @@ function localProjectFiles(): string[] {
 }
 
 export async function inspectTarget(input: InspectInput): Promise<InspectResult> {
-  const token =
-    input.token ?? process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? undefined;
+  const token = resolveToken(input.token);
 
   // Local file mode
   if (fs.existsSync(input.target) && fs.statSync(input.target).isFile()) {
@@ -124,7 +123,7 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
 }
 
 export function formatInspectHuman(r: InspectResult): string {
-  return [
+  const body = [
     `source: ${r.source}`,
     r.runUrl && r.runUrl !== r.source ? `run: ${r.runUrl}` : null,
     `ecosystem: ${r.ecosystem} (confidence: ${r.confidence})`,
@@ -137,7 +136,6 @@ export function formatInspectHuman(r: InspectResult): string {
     `hint: ${r.hint}`,
     `redactions: ${r.redactions}`,
     `runtime: Node=${r.runtime.node ?? "?"} Python=${r.runtime.python ?? "?"} Go=${r.runtime.go ?? "?"} Rust=${r.runtime.rust ?? "?"} OS=${r.runtime.os ?? "?"}`,
-  ]
-    .filter((x): x is string => x !== null)
-    .join("\n");
+  ].filter((x): x is string => x !== null);
+  return ["ActionRepro inspection", ...body.map((line) => `  ${line}`)].join("\n");
 }

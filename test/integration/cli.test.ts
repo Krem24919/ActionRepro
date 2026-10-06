@@ -17,6 +17,7 @@ describe("CLI integration (local fixtures, no network)", () => {
     const out = runCli(["inspect", fx("npm-fail.log")]);
     expect(out).toMatch(/ecosystem: npm/);
     expect(out).toMatch(/repro command: npm test/);
+    expect(out.split("\n")[0]).toBe("ActionRepro inspection");
   });
 
   it("reproduce creates a bundle from a local log file", () => {
@@ -24,6 +25,7 @@ describe("CLI integration (local fixtures, no network)", () => {
     const outDir = path.join(tmp, "actionrepro");
     const out = runCli(["reproduce", fx("python-fail.log"), "--out", outDir]);
     expect(out).toMatch(/bundle:/);
+    expect(out.split("\n")[0]).toBe("ActionRepro result");
     for (const f of [
       "reproduce.sh",
       "README.md",

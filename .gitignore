@@ -7,3 +7,4 @@ actionrepro/
 *.log
 !fixtures/logs/*.log
 !.gitignore
+.trashed-*

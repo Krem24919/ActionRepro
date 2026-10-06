@@ -25,4 +25,22 @@ describe("parseGitHubRunUrl", () => {
     expect(isGitHubRunUrl("https://github.com/o/r/actions/runs/1")).toBe(true);
     expect(isGitHubRunUrl("not a url")).toBe(false);
   });
+
+  it("rejects unsafe owner/repo segments", () => {
+    expect(parseGitHubRunUrl("https://github.com/a%20b/r/actions/runs/1")).toBeNull();
+    expect(parseGitHubRunUrl("https://github.com/../x/actions/runs/1")).toBeNull();
+    expect(parseGitHubRunUrl("https://github.com/o/../actions/runs/1")).toBeNull();
+    expect(parseGitHubRunUrl("https://github.com/o/r/actions/runs/1;rm")).toBeNull();
+  });
+
+  it("accepts api URLs and .git suffix", () => {
+    expect(
+      parseGitHubRunUrl("https://api.github.com/repos/o/r/actions/runs/42"),
+    ).toMatchObject({ owner: "o", repo: "r", runId: "42" });
+    expect(parseGitHubRunUrl("https://github.com/o/r.git/actions/runs/7")).toMatchObject({
+      owner: "o",
+      repo: "r",
+      runId: "7",
+    });
+  });
 });

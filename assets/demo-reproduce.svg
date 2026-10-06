@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 452" role="img" aria-label="actionrepro reproduce terminal demo">
+  <rect x="1" y="1" width="758" height="450" rx="10" fill="#0d1117" stroke="#30363d" stroke-width="2"/>
+  <circle cx="28" cy="26" r="7" fill="#ff5f56"/>
+  <circle cx="52" cy="26" r="7" fill="#ebbd2d"/>
+  <circle cx="76" cy="26" r="7" fill="#27c93f"/>
+  <text x="100" y="31" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" fill="#8b949e">actionrepro — reproduce</text>
+  <text font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14">
+    <tspan x="20" y="64"><tspan fill="#3fb950">$ </tspan><tspan fill="#e6edf3">actionrepro ./failure.log --out ./actionrepro</tspan></tspan>
+    <tspan x="20" y="86" fill="#e6edf3" font-weight="bold">ActionRepro result</tspan>
+    <tspan x="20" y="108" fill="#e6edf3">  failure: Failure: ## [error]Process completed with exit code 1.</tspan>
+    <tspan x="20" y="130" fill="#e6edf3">  ecosystem: npm</tspan>
+    <tspan x="20" y="152" fill="#e6edf3">  repro command: npm test</tspan>
+    <tspan x="20" y="174" fill="#e6edf3">  bundle: actionrepro/</tspan>
+    <tspan x="20" y="196" fill="#8b949e">    - actionrepro/reproduce.sh</tspan>
+    <tspan x="20" y="218" fill="#8b949e">    - actionrepro/reproduce.ps1</tspan>
+    <tspan x="20" y="240" fill="#8b949e">    - actionrepro/README.md</tspan>
+    <tspan x="20" y="262" fill="#8b949e">    - actionrepro/failure.txt</tspan>
+    <tspan x="20" y="284" fill="#8b949e">    - actionrepro/environment.txt</tspan>
+    <tspan x="20" y="306" fill="#8b949e">    - actionrepro/repro.json</tspan>
+    <tspan x="20" y="328" fill="#e6edf3">  redactions: 0</tspan>
+    <tspan x="20" y="350" fill="#e6edf3">  tip: run ./actionrepro/reproduce.sh</tspan>
+    <tspan x="20" y="372"><tspan fill="#3fb950">$ </tspan><tspan fill="#e6edf3">./actionrepro/reproduce.sh</tspan></tspan>
+    <tspan x="20" y="394" fill="#e6edf3">==&gt; REPRODUCED: command exited with code 1.</tspan>
+    <tspan x="20" y="416" fill="#8b949e">Compare it with the CI failure shown above.</tspan>
+  </text>
+</svg>

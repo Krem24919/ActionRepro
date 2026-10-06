@@ -4,10 +4,43 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- GitHub CLI token fallback: when no `--token` flag or `GITHUB_TOKEN`/`GH_TOKEN`
+  env var is set, the authenticated `gh` CLI token is used automatically
+  (local subprocess only, validated, never printed). `doctor` reports the
+  active token source.
+
 ### Changed
 
+- Visual pass: CLI output uses `ActionRepro <command>` headers with grouped
+  indentation; generated bundle README leads with run instructions;
+  main README gained CI/license badges, a contents index, a logo, and
+  terminal demo images (`assets/`).
+  No behavior or output-contract changes (`--json` untouched).
 - Renamed the project from `ci-repro` to `ActionRepro` (npm package + CLI
   `actionrepro`, default bundle directory `actionrepro/`).
+
+### Security
+
+- Treat CI-extracted repro commands as untrusted: `reproduce.sh`/`reproduce.ps1`
+  now show a security notice, print the exact command, and ask for
+  confirmation on interactive terminals (`CI_REPRO_YES=1` skips it;
+  non-interactive shells never hang). Exit codes distinguish setup failure
+  (`3`) from user abort (`4`) from the command's own exit code.
+- Escape log-derived metadata (`$`, backticks, quotes) embedded in generated
+  scripts so hostile log text can never execute at script run time; the repro
+  command itself stays byte-identical.
+- Reject unsafe owner/repo URL segments before any API call.
+
+- `release.yml` split: tag pushes always verify + create the GitHub Release;
+  npm publishing is opt-in (`NPM_PUBLISH_ENABLED=true` + `NPM_TOKEN`) and can
+  no longer block a release.
+- Bundle scripts report `INSTALL_FAILED` / `REPRODUCED` / `NOT REPRODUCED`
+  explicitly; install problems are never presented as reproduction results.
+- Docs: install-from-source until first npm publish, fixed invalid action
+  example, removed unimplemented comment-posting claims, redaction described
+  as best-effort everywhere.
 
 ### Fixed
 

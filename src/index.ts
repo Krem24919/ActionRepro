@@ -6,7 +6,13 @@ export { redactText } from "./core/redact.js";
 export { extractFailure, findReproCommand } from "./core/extract.js";
 export { detectEcosystem } from "./core/ecosystems.js";
 export { detectRuntime } from "./core/runtime.js";
-export { createBundle } from "./core/bundle.js";
+export { createBundle, shDq, psDq } from "./core/bundle.js";
 export { GitHubActionsProvider } from "./providers/github-actions.js";
-export { allLogsFailed, firstLogError } from "./core/github.js";
+export {
+  allLogsFailed,
+  firstLogError,
+  resolveToken,
+  resolveTokenWithSource,
+} from "./core/github.js";
+export type { TokenSource } from "./core/github.js";
 export { sanitizeActionsOutput } from "./utils/log.js";

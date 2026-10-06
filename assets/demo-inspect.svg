@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" role="img" aria-label="actionrepro inspect terminal demo">
+  <rect x="1" y="1" width="758" height="298" rx="10" fill="#0d1117" stroke="#30363d" stroke-width="2"/>
+  <circle cx="28" cy="26" r="7" fill="#ff5f56"/>
+  <circle cx="52" cy="26" r="7" fill="#ebbd2d"/>
+  <circle cx="76" cy="26" r="7" fill="#27c93f"/>
+  <text x="100" y="31" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" fill="#8b949e">actionrepro — inspect</text>
+  <text font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14">
+    <tspan x="20" y="64"><tspan fill="#3fb950">$ </tspan><tspan fill="#e6edf3">actionrepro inspect fixtures/logs/npm-fail.log</tspan></tspan>
+    <tspan x="20" y="86" fill="#e6edf3" font-weight="bold">ActionRepro inspection</tspan>
+    <tspan x="20" y="108" fill="#e6edf3">  source: fixtures/logs/npm-fail.log</tspan>
+    <tspan x="20" y="130" fill="#e6edf3">  ecosystem: npm (confidence: high)</tspan>
+    <tspan x="20" y="152" fill="#e6edf3">  evidence: log mentions npm command; log contains npm ERR!</tspan>
+    <tspan x="20" y="174" fill="#e6edf3">  failure: Failure: ## [error]Process completed with exit code 1.</tspan>
+    <tspan x="20" y="196" fill="#e6edf3">  exit code: 1</tspan>
+    <tspan x="20" y="218" fill="#e6edf3">  repro command: npm test</tspan>
+    <tspan x="20" y="240" fill="#e6edf3">  hint: Re-run `npm test` locally after installing dependencies.</tspan>
+    <tspan x="20" y="262" fill="#e6edf3">  redactions: 0</tspan>
+  </text>
+</svg>

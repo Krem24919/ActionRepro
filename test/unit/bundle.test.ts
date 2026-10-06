@@ -45,6 +45,10 @@ describe("createBundle", () => {
     }
     const sh = fs.readFileSync(path.join(out, "reproduce.sh"), "utf8");
     expect(sh.startsWith("#!/usr/bin/env bash")).toBe(true);
+    const readme = fs.readFileSync(path.join(out, "README.md"), "utf8");
+    // Run-first layout: usage comes before source details and file list.
+    expect(readme.indexOf("## Run this first")).toBeLessThan(readme.indexOf("## Source"));
+    expect(readme.indexOf("## Source")).toBeLessThan(readme.indexOf("## Files"));
     fs.rmSync(out, { recursive: true, force: true });
   });
 

@@ -43,6 +43,7 @@ program
       opts: { out: string; run: boolean; token?: string; json: boolean },
     ) => {
       try {
+        if (opts.run) printRunWarning();
         const res = await reproduceTarget({
           target,
           outDir: opts.out,
@@ -51,13 +52,14 @@ program
         });
         if (opts.json) console.log(JSON.stringify({ ok: true, ...res }, null, 2));
         else {
-          console.log(`failure: ${safeOut(res.summary)}`);
-          console.log(`ecosystem: ${res.ecosystem}`);
-          console.log(`repro command: ${safeOut(res.reproCommand ?? "(none)")}`);
-          console.log(`bundle: ${res.outDir}/`);
-          for (const f of res.files) console.log(`  - ${f}`);
-          console.log(`redactions: ${res.redactions}`);
-          if (opts.run) console.log(`reproduce exit code: ${res.exitCode ?? "?"}`);
+          printResultHead();
+          console.log(`  failure: ${safeOut(res.summary)}`);
+          console.log(`  ecosystem: ${res.ecosystem}`);
+          console.log(`  repro command: ${safeOut(res.reproCommand ?? "(none)")}`);
+          console.log(`  bundle: ${res.outDir}/`);
+          for (const f of res.files) console.log(`    - ${f}`);
+          console.log(`  redactions: ${res.redactions}`);
+          if (opts.run) console.log(`  reproduce exit code: ${res.exitCode ?? "?"}`);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -103,6 +105,7 @@ async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
   if (first.startsWith("-")) return false;
   const parsed = parseDefaultArgs(argv);
   try {
+    if (parsed.run) printRunWarning();
     const res = await reproduceTarget({
       target: parsed.target,
       outDir: parsed.out,
@@ -112,17 +115,18 @@ async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
     if (parsed.json) {
       console.log(JSON.stringify({ ok: true, ...res, files: res.files }, null, 2));
     } else {
-      console.log(`failure: ${safeOut(res.summary)}`);
-      console.log(`ecosystem: ${res.ecosystem}`);
-      console.log(`repro command: ${safeOut(res.reproCommand ?? "(none)")}`);
-      console.log(`bundle: ${res.outDir}/`);
-      for (const f of res.files) console.log(`  - ${f}`);
-      console.log(`redactions: ${res.redactions}`);
-      if (parsed.run) console.log(`reproduce exit code: ${res.exitCode ?? "?"}`);
+      printResultHead();
+      console.log(`  failure: ${safeOut(res.summary)}`);
+      console.log(`  ecosystem: ${res.ecosystem}`);
+      console.log(`  repro command: ${safeOut(res.reproCommand ?? "(none)")}`);
+      console.log(`  bundle: ${res.outDir}/`);
+      for (const f of res.files) console.log(`    - ${f}`);
+      console.log(`  redactions: ${res.redactions}`);
+      if (parsed.run) console.log(`  reproduce exit code: ${res.exitCode ?? "?"}`);
       else
         console.log(
           sanitizeActionsOutput(
-            `tip: run ${displayScriptPath(res.outDir)}  (or: actionrepro reproduce "${parsed.target}" --run)`,
+            `  tip: run ${displayScriptPath(res.outDir)}  (or: actionrepro reproduce "${parsed.target}" --run)`,
           ),
         );
     }
@@ -175,6 +179,20 @@ function parseDefaultArgs(argv: string[]): {
 
 function safeOut(s: string): string {
   return sanitizeActionsOutput(redactText(s).text);
+}
+
+function printResultHead(): void {
+  console.log("ActionRepro result");
+}
+
+function printRunWarning(): void {
+  console.log(
+    sanitizeActionsOutput(
+      "warning: --run executes the CI-extracted command on this machine. " +
+        "The script asks for confirmation on interactive terminals; " +
+        "non-interactive shells run without prompting (set CI_REPRO_YES=1 to pre-approve).",
+    ),
+  );
 }
 
 function stripDotSlash(p: string): string {

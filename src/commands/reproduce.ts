@@ -9,7 +9,7 @@ import { detectEcosystem } from "../core/ecosystems.js";
 import { detectRuntime } from "../core/runtime.js";
 import { createBundle } from "../core/bundle.js";
 import { runReproduceScript } from "../core/runner.js";
-import { allLogsFailed, firstLogError } from "../core/github.js";
+import { allLogsFailed, firstLogError, resolveToken } from "../core/github.js";
 import type { CiFetchResult } from "../providers/types.js";
 
 function failingJobFrom(fetched: CiFetchResult): string | undefined {
@@ -43,8 +43,7 @@ function localProjectFiles(): string[] {
 
 export async function reproduceTarget(opts: ReproduceOptions): Promise<ReproduceResult> {
   const outDir = path.resolve(opts.outDir ?? "actionrepro");
-  const token =
-    opts.token ?? process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? undefined;
+  const token = resolveToken(opts.token);
 
   if (fs.existsSync(opts.target) && fs.statSync(opts.target).isFile()) {
     const loaded = loadLogsFromFile(opts.target);

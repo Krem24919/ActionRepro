@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
+import { resolveTokenWithSource } from "../core/github.js";
 
 export interface DoctorCheck {
   name: string;
@@ -84,14 +85,16 @@ export async function doctor(): Promise<DoctorResult> {
     }
   }
 
-  const token = (process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? "").trim();
+  const { token, source } = resolveTokenWithSource();
   checks.push({
     name: "github-token",
     ok: true,
-    detail: token
-      ? "present (will be used for API; never printed)"
-      : "absent — public repos work, private repos need GITHUB_TOKEN",
+    detail:
+      source === "none"
+        ? "absent — set GITHUB_TOKEN, or install + auth the gh CLI (used automatically)"
+        : `available via ${source} (will be used for API; never printed)`,
   });
+  void token;
 
   const net = await networkOk();
   checks.push({ name: "network(api.github.com)", ok: net.ok, detail: net.detail });
@@ -113,9 +116,11 @@ export async function doctor(): Promise<DoctorResult> {
 }
 
 export function formatDoctorHuman(r: DoctorResult): string {
-  const lines = r.checks.map((c) => `${c.ok ? "PASS" : "FAIL"}  ${c.name}: ${c.detail}`);
+  const lines = r.checks.map(
+    (c) => `  ${c.ok ? "PASS" : "FAIL"}  ${c.name}: ${c.detail}`,
+  );
   lines.push(
     r.ok ? "doctor: all required checks passed" : "doctor: some required checks failed",
   );
-  return lines.join("\n");
+  return ["ActionRepro doctor", ...lines].join("\n");
 }

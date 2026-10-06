@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+
 export interface GitHubRun {
   id: number;
   name?: string;
@@ -41,6 +43,49 @@ export function authHeaders(token?: string): Record<string, string> {
   const t = (token ?? process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? "").trim();
   if (t) h.Authorization = `Bearer ${t}`;
   return h;
+}
+
+export type TokenSource = "flag" | "env" | "gh" | "none";
+
+const TOKEN_SHAPE = /^[A-Za-z0-9_.-]+$/;
+
+/** Read the GitHub CLI token without ever printing it. Silent when unavailable. */
+function tokenFromGh(): string | undefined {
+  try {
+    const r = spawnSync("gh", ["auth", "token"], {
+      encoding: "utf8",
+      timeout: 8000,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    if (r.status !== 0) return undefined;
+    const t = String(r.stdout ?? "").trim();
+    if (!t || !TOKEN_SHAPE.test(t)) return undefined;
+    return t;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Token precedence: explicit --token flag, then GITHUB_TOKEN/GH_TOKEN env,
+ * then the GitHub CLI (`gh auth token`). The `gh` subprocess runs locally
+ * only; its output is validated and never printed.
+ */
+export function resolveTokenWithSource(explicit?: string): {
+  token?: string;
+  source: TokenSource;
+} {
+  const flag = (explicit ?? "").trim();
+  if (flag) return { token: flag, source: "flag" };
+  const env = (process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? "").trim();
+  if (env) return { token: env, source: "env" };
+  const gh = tokenFromGh();
+  if (gh) return { token: gh, source: "gh" };
+  return { source: "none" };
+}
+
+export function resolveToken(explicit?: string): string | undefined {
+  return resolveTokenWithSource(explicit).token;
 }
 
 async function getJson(url: string, token?: string): Promise<any> {

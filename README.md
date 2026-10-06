@@ -1,6 +1,14 @@
 # ActionRepro
 
+<p align="center">
+  <img src="assets/logo.svg" alt="ActionRepro logo" width="128" />
+</p>
+
 > Repository: https://github.com/Krem24919/ActionRepro
+
+[![CI](https://github.com/Krem24919/ActionRepro/actions/workflows/ci.yml/badge.svg)](https://github.com/Krem24919/ActionRepro/actions/workflows/ci.yml)
+[![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Turn a failed **GitHub Actions** run into a **local reproducibility bundle** — deterministically, with no LLM, no backend, no telemetry.
 
@@ -10,7 +18,7 @@ npx actionrepro https://github.com/OWNER/REPO/actions/runs/RUN_ID
 actionrepro ./failure.log
 ```
 
-It fetches the workflow run + jobs + logs via the official GitHub API, detects the ecosystem (`npm` / `pnpm` / `yarn` / `pip` / `uv` / `cargo` / `go`), extracts the failure cause and the closest repro command, redacts secrets, and writes a ready-to-run `actionrepro/` folder.
+It fetches the workflow run + jobs + logs via the official GitHub API, detects the ecosystem (`npm` / `pnpm` / `yarn` / `pip` / `uv` / `cargo` / `go`), extracts the most likely failure cause and the closest repro command, redacts secrets heuristically, and writes a ready-to-run `actionrepro/` folder.
 
 ## Before / after
 
@@ -25,28 +33,10 @@ npm ERR! Exit status 1
 
 **After:** one command gives you a runnable bundle.
 
-```bash
-$ npx actionrepro https://github.com/acme/app/actions/runs/123456789
-failure: Failure in job "test" / step "Run npm test": ##[error]Process completed with exit code 1.
-ecosystem: npm
-repro command: npm test
-bundle: actionrepro/
-  - actionrepro/reproduce.sh
-  - actionrepro/reproduce.ps1
-  - actionrepro/README.md
-  - actionrepro/failure.txt
-  - actionrepro/environment.txt
-  - actionrepro/repro.json
-redactions: 0
-tip: run ./actionrepro/reproduce.sh
+![actionrepro reproduce demo](assets/demo-reproduce.svg)
 
-$ ./actionrepro/reproduce.sh
-==> actionrepro: ecosystem=npm confidence=high
-==> failure: Failure in job "test" / step "Run npm test": ...
-==> Step 1/2: install dependencies
-==> Step 2/2: reproduce failure
-==> running: npm test
-```
+(`## [error]` — with a space — is intentional: it stops CI runners from
+parsing our output into phantom annotations.)
 
 Local-file mode is identical, minus the network:
 
@@ -55,14 +45,33 @@ actionrepro ./failure.log --out ./actionrepro
 cat actionrepro/failure.txt
 ```
 
+## Contents
+
+- [Before / after](#before--after)
+- [Install](#install)
+- [Usage](#usage)
+- [What the bundle contains](#what-the-bundle-contains)
+- [Security: secret redaction](#security-secret-redaction)
+- [GitHub Action (optional, for other repos)](#github-action-optional-for-other-repos)
+- [How failure extraction works (no LLM)](#how-failure-extraction-works-no-llm)
+- [Project layout](#project-layout)
+- [Development](#development)
+- [License](#license)
+
 ## Install
 
 Requires **Node.js ≥ 18**. No Docker required. Best experience on Linux and Termux.
 
+Until the first npm publish, install from source:
+
 ```bash
-npm install -g actionrepro
-# or one-shot:
-npx actionrepro --help
+git clone https://github.com/Krem24919/ActionRepro.git
+cd ActionRepro
+npm install
+npm run build
+node dist/cli.js --help
+# optional one-shot afterwards:
+# npm install -g actionrepro   # works once published to npm
 ```
 
 Termux:
@@ -91,12 +100,26 @@ actionrepro doctor
 actionrepro doctor --json
 ```
 
+![actionrepro inspect demo](assets/demo-inspect.svg)
+
 Private repos and higher rate limits:
 
 ```bash
 export GITHUB_TOKEN=ghp_...   # never printed; only sent to api.github.com
 actionrepro https://github.com/ORG/PRIVATE/actions/runs/ID
 ```
+
+No token handy but have the GitHub CLI? If `gh` is installed and authenticated,
+its token is used automatically — no flags needed:
+
+```bash
+gh auth login
+actionrepro https://github.com/ORG/PRIVATE/actions/runs/ID
+```
+
+Token precedence: `--token` flag, then `GITHUB_TOKEN`/`GH_TOKEN` env, then
+`gh auth token` (runs locally, output validated, never printed). `doctor`
+shows which source is active.
 
 Authentication notes (verified against the live GitHub API):
 
@@ -128,11 +151,13 @@ The script is ecosystem-aware:
 - `pip` → `pip install -r requirements.txt` then `pytest`
 - `uv` → `uv sync` then `uv run pytest`
 - `cargo` → `cargo fetch` then `cargo test`
-- `go` → `go mod download` then `go test ./...`
+- `go` → `go mod download` then `go test ./...``
+
+Scope: the bundle replays dependency install + the closest failing command with your user privileges. It does not check out any commit, and does not provide CI services, caches, artifacts, secrets, or matrix variables — a pass/fail here is best-effort evidence, not proof.`
 
 ## Security: secret redaction
 
-Every log line, summary, file, and error message passes through deterministic redaction before it is printed or written:
+Every log line, summary, file, and error message passes through deterministic, pattern-based redaction before it is printed or written. It is best-effort, not a guarantee — always review a bundle before sharing:
 
 - `ghp_/gho_/ghu_/ghs_/ghr_`, `github_pat_`, `xox*`, `sk_live/test`, `AKIA…`
 - `Bearer …` / `Basic …`, `_authToken=…`, PEM private-key blocks
@@ -157,7 +182,6 @@ on:
 permissions:
   actions: read
   contents: read
-  issues: write # only if you want the safe comment
 
 jobs:
   repro:
@@ -165,10 +189,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: node:20
-        with: {}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - name: Build repro bundle (redacted)
-        uses: ./ # or: owner/ActionRepro@v1
+        uses: Krem24919/ActionRepro@v0.1.0
         with:
           run-url: ${{ github.event.workflow_run.html_url }}
           out: actionrepro
@@ -180,7 +205,7 @@ jobs:
           path: actionrepro/
 ```
 
-The composite action (`action.yml`) runs `npx actionrepro` with redaction and uploads `actionrepro/` as an artifact. It never prints `GITHUB_TOKEN` and never posts raw logs — the optional comment path posts only the redacted summary + repro command. See [action.yml](action.yml).
+The composite action (`action.yml`) runs `actionrepro reproduce --json` with redaction and uploads `actionrepro/` as an artifact. It never prints `GITHUB_TOKEN` and never posts raw logs. See [action.yml](action.yml).
 
 ## How failure extraction works (no LLM)
 
