@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- The reusable action (`action.yml`) no longer depends on an npm publish:
+  it builds itself from the pinned tag's source, so
+  `uses: Krem24919/ActionRepro@v0.2.0` works today. New `log-file` input
+  as an alternative to `run-url` for saved logs.
+- Our own CI now dogfoods the composite action on every push
+  (`.github/workflows/dogfood.yml`): build from source, bundle a fixture
+  log, assert outputs and bundle files.
+
 ## [0.2.0] - 2026-10-06
 
 ### Added

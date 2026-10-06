@@ -4,8 +4,6 @@
   <img src="assets/logo.svg?v=2" alt="ActionRepro logo" width="128" />
 </p>
 
-> Repository: https://github.com/Krem24919/ActionRepro
-
 [![CI](https://github.com/Krem24919/ActionRepro/actions/workflows/ci.yml/badge.svg)](https://github.com/Krem24919/ActionRepro/actions/workflows/ci.yml)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -13,7 +11,7 @@
 Turn a failed **GitHub Actions** run into a **local reproducibility bundle** — deterministically, with no LLM, no backend, no telemetry.
 
 ```bash
-npx actionrepro https://github.com/OWNER/REPO/actions/runs/RUN_ID
+actionrepro https://github.com/OWNER/REPO/actions/runs/RUN_ID
 # or from a saved log file (no network needed):
 actionrepro ./failure.log
 ```
@@ -64,9 +62,7 @@ cat actionrepro/failure.txt
 
 Requires **Node.js ≥ 18**. No Docker required. Best experience on Linux and Termux.
 
-> The `actionrepro` package is not on npm yet (checked 2026-10-06), so
-> `npx actionrepro` does not resolve today. Until the first publish, install
-> from source — afterwards `npx actionrepro@latest` will work as documented:
+From source (works today):
 
 ```bash
 git clone https://github.com/Krem24919/ActionRepro.git
@@ -74,9 +70,14 @@ cd ActionRepro
 npm install
 npm run build
 node dist/cli.js --help
-# after the first npm publish this becomes:
-# npx actionrepro@latest ./failure.log
+# put it on your PATH:
+npm install -g .
+actionrepro --help
 ```
+
+> The `actionrepro` package is not on npm yet (checked 2026-10-06), so
+> `npx actionrepro` does not resolve today. After the first publish it
+> becomes a one-liner: `npx actionrepro@latest ./failure.log`.
 
 Termux (from source):
 
@@ -172,7 +173,7 @@ The script is ecosystem-aware:
 - `pip` → `pip install -r requirements.txt` then `pytest`
 - `uv` → `uv sync` then `uv run pytest`
 - `cargo` → `cargo fetch` then `cargo test`
-- `go` → `go mod download` then `go test ./...``
+- `go` → `go mod download` then `` `go test ./...` ``
 
 Scope: the bundle replays dependency install + the closest failing command with your user privileges. It does not check out any commit, and does not provide CI services, caches, artifacts, secrets, or matrix variables — a pass/fail here is best-effort evidence, not proof.`
 
@@ -194,6 +195,8 @@ Real output (same failure → still broken; different log → fixed or changed):
 ActionRepro verification
   recorded fingerprint: 448b198fe15ef98f
   fresh fingerprint: 448b198fe15ef98f
+  CI exit code: 1
+  fresh exit code: 1
   verdict: REPRODUCED
   reason: Fresh failure fingerprint matches the recorded CI fingerprint.
 ```
@@ -242,12 +245,12 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: Build repro bundle (redacted)
-        uses: Krem24919/ActionRepro@v0.1.1
+        uses: Krem24919/ActionRepro@v0.2.0
         with:
           run-url: ${{ github.event.workflow_run.html_url }}
           out: actionrepro
@@ -259,7 +262,12 @@ jobs:
           path: actionrepro/
 ```
 
-The composite action (`action.yml`) runs `actionrepro reproduce --json` with redaction and uploads `actionrepro/` as an artifact. It never prints `GITHUB_TOKEN` and never posts raw logs. See [action.yml](action.yml).
+The composite action (`action.yml`) builds itself from the pinned tag's
+source (no npm publish required), runs `reproduce --json` with redaction,
+and uploads `actionrepro/` as an artifact. It never prints `GITHUB_TOKEN`
+and never posts raw logs. Pass `run-url` for a run, or `log-file` (a path
+in your checkout) for a saved log — see [action.yml](action.yml). Our own
+CI dogfoods it on every push (`.github/workflows/dogfood.yml`).
 
 ## How failure extraction works (no LLM)
 
@@ -280,8 +288,8 @@ src/
   commands/              # inspect.ts reproduce.ts doctor.ts verify.ts
   core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts fingerprint.ts workflow.ts
   providers/             # types.ts (CiProvider) + github-actions.ts
-  ecosystems/            # reserved: per-ecosystem adapters (registry pattern)
-  utils/
+  ecosystems/            # adapters.ts + registry.ts + types.ts (per-ecosystem behavior)
+  utils/                 # fs.ts log.ts version.ts
 test/unit/ test/integration/   # vitest, deterministic fixtures
 fixtures/logs/ fixtures/api/
 action.yml               # reusable composite action

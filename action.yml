@@ -7,8 +7,13 @@ branding:
 
 inputs:
   run-url:
-    description: GitHub Actions run URL, e.g. https://github.com/OWNER/REPO/actions/runs/123
-    required: true
+    description: GitHub Actions run URL, e.g. https://github.com/OWNER/REPO/actions/runs/123 (provide this or log-file)
+    required: false
+    default: ""
+  log-file:
+    description: Path to a saved failure log file, relative to your checkout (local-file mode, no network). Alternative to run-url.
+    required: false
+    default: ""
   out:
     description: Output directory for the bundle
     required: false
@@ -18,7 +23,7 @@ inputs:
     required: false
     default: "false"
   token:
-    description: GitHub token (defaults to secrets.GITHUB_TOKEN). Never printed.
+    description: GitHub token for downloading run logs (defaults to secrets.GITHUB_TOKEN, only used with run-url). Never printed.
     required: false
     default: ${{ github.token }}
 
@@ -40,19 +45,34 @@ runs:
       uses: actions/setup-node@v7
       with:
         node-version: 20
+    - name: Build actionrepro from source
+      shell: bash
+      run: |
+        set -euo pipefail
+        # No npm publish required: the pinned action tag carries its own source.
+        cd "${{ github.action_path }}"
+        npm ci
+        npm run build
     - name: Generate redacted repro bundle
       id: repro
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
         ACTIONREPRO_URL: ${{ inputs.run-url }}
+        ACTIONREPRO_LOG: ${{ inputs.log-file }}
         ACTIONREPRO_OUT: ${{ inputs.out }}
         ACTIONREPRO_RUN: ${{ inputs.run }}
       run: |
         set -euo pipefail
-        # NOTE: requires the actionrepro npm package to be published.
-        # Until the first publish, consume this action from a source checkout instead.
-        npx -y actionrepro@latest reproduce "$ACTIONREPRO_URL" --out "$ACTIONREPRO_OUT" --json > /tmp/actionrepro.json
+        if [ -n "$ACTIONREPRO_URL" ]; then
+          TARGET="$ACTIONREPRO_URL"
+        elif [ -n "$ACTIONREPRO_LOG" ]; then
+          TARGET="$ACTIONREPRO_LOG"
+        else
+          echo "actionrepro: provide the 'run-url' or 'log-file' input." >&2
+          exit 2
+        fi
+        node "${{ github.action_path }}/dist/cli.js" reproduce "$TARGET" --out "$ACTIONREPRO_OUT" --json > /tmp/actionrepro.json
         # Extract redacted-only fields with node (no secrets echoed; the JSON itself is already redacted).
         OUT_DIR=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/actionrepro.json','utf8')).outDir ?? '$ACTIONREPRO_OUT')")
         SUMMARY=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/actionrepro.json','utf8')).summary ?? '')")

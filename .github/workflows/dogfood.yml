@@ -1,0 +1,49 @@
+name: dogfood
+
+# End-to-end test of the reusable action (action.yml) against a fixture log.
+# This exercises the real composite-action path: build from source, bundle,
+# outputs, and artifact upload — not just the CLI.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel outdated runs on new pushes so CI signal always matches the latest code.
+concurrency:
+  group: dogfood-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run our own action on a fixture log
+        id: repro
+        uses: ./
+        with:
+          log-file: fixtures/logs/npm-fail.log
+          out: actionrepro-dogfood
+      - name: Check outputs and bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${{ steps.repro.outputs.summary }}"
+          test -n "${{ steps.repro.outputs.repro-command }}"
+          test -f actionrepro-dogfood/reproduce.sh
+          test -f actionrepro-dogfood/reproduce.ps1
+          test -f actionrepro-dogfood/repro.json
+          test -f actionrepro-dogfood/bundle.sha256
+          echo "out-dir=${{ steps.repro.outputs.out-dir }}"
+          echo "summary=${{ steps.repro.outputs.summary }}"
+          echo "repro=${{ steps.repro.outputs.repro-command }}"
+      - name: Upload dogfood bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: actionrepro-dogfood-bundle
+          path: actionrepro-dogfood/
