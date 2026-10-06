@@ -51,18 +51,22 @@ cat actionrepro/failure.txt
 - [Install](#install)
 - [Usage](#usage)
 - [What the bundle contains](#what-the-bundle-contains)
+- [Verifying a fix (`verify`)](#verifying-a-fix-verify)
 - [Security: secret redaction](#security-secret-redaction)
 - [GitHub Action (optional, for other repos)](#github-action-optional-for-other-repos)
 - [How failure extraction works (no LLM)](#how-failure-extraction-works-no-llm)
 - [Project layout](#project-layout)
 - [Development](#development)
+- [Troubleshooting / FAQ](#troubleshooting--faq)
 - [License](#license)
 
 ## Install
 
 Requires **Node.js ≥ 18**. No Docker required. Best experience on Linux and Termux.
 
-Until the first npm publish, install from source:
+> The `actionrepro` package is not on npm yet (checked 2026-10-06), so
+> `npx actionrepro` does not resolve today. Until the first publish, install
+> from source — afterwards `npx actionrepro@latest` will work as documented:
 
 ```bash
 git clone https://github.com/Krem24919/ActionRepro.git
@@ -70,15 +74,17 @@ cd ActionRepro
 npm install
 npm run build
 node dist/cli.js --help
-# optional one-shot afterwards:
-# npm install -g actionrepro   # works once published to npm
+# after the first npm publish this becomes:
+# npx actionrepro@latest ./failure.log
 ```
 
-Termux:
+Termux (from source):
 
 ```bash
 pkg update && pkg install -y git nodejs python
-npx actionrepro ./failure.log
+git clone https://github.com/Krem24919/ActionRepro.git
+cd ActionRepro && npm install && npm run build
+node dist/cli.js ./failure.log
 ```
 
 ## Usage
@@ -167,6 +173,39 @@ The script is ecosystem-aware:
 
 Scope: the bundle replays dependency install + the closest failing command with your user privileges. It does not check out any commit, and does not provide CI services, caches, artifacts, secrets, or matrix variables — a pass/fail here is best-effort evidence, not proof.`
 
+## Verifying a fix (`verify`)
+
+Fixed something and want proof the failure is gone? Re-run the bundle's
+command locally, save the output, and compare it against the fingerprint
+recorded from CI:
+
+```bash
+actionrepro reproduce ./ci-failure.log --out ./actionrepro
+bash actionrepro/reproduce.sh > ./local-run.log 2>&1
+actionrepro verify ./actionrepro ./local-run.log
+```
+
+Real output (same failure → still broken; different log → fixed or changed):
+
+```
+ActionRepro verification
+  recorded fingerprint: 448b198fe15ef98f
+  fresh fingerprint: 448b198fe15ef98f
+  verdict: REPRODUCED
+  reason: Fresh failure fingerprint matches the recorded CI fingerprint.
+```
+
+```
+  verdict: NOT_REPRODUCED
+  reason: Fresh failure fingerprint differs from the recorded CI fingerprint.
+```
+
+Exit codes are CI-friendly: `0` = REPRODUCED, `1` = NOT_REPRODUCED,
+`2` = INCONCLUSIVE (bundle or log unreadable). Add `--json` for the
+machine-readable form. The comparison is a stable hash over ecosystem,
+command, exit code, and normalized error lines — no probabilities, just
+match / differ / unreadable.
+
 ## Security: secret redaction
 
 Every log line, summary, file, and error message passes through deterministic, pattern-based redaction before it is printed or written. It is best-effort, not a guarantee — always review a bundle before sharing:
@@ -205,7 +244,7 @@ jobs:
         with:
           node-version: 20
       - name: Build repro bundle (redacted)
-        uses: Krem24919/ActionRepro@v0.1.0
+        uses: Krem24919/ActionRepro@v0.1.1
         with:
           run-url: ${{ github.event.workflow_run.html_url }}
           out: actionrepro
@@ -233,10 +272,10 @@ Same input → same output. Fixtures live in [`fixtures/logs/`](fixtures/logs/).
 
 ```
 src/
-  cli.ts                 # commander wiring (default/inspect/reproduce/doctor)
+  cli.ts                 # commander wiring (default/inspect/reproduce/doctor/verify)
   index.ts               # public library exports
-  commands/              # inspect.ts reproduce.ts doctor.ts
-  core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts
+  commands/              # inspect.ts reproduce.ts doctor.ts verify.ts
+  core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts fingerprint.ts workflow.ts
   providers/             # types.ts (CiProvider) + github-actions.ts
   ecosystems/            # reserved: per-ecosystem adapters (registry pattern)
   utils/
@@ -263,6 +302,36 @@ node dist/cli.js inspect fixtures/logs/npm-fail.log
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [CHANGELOG.md](CHANGELOG.md).
+
+## Troubleshooting / FAQ
+
+**`reproduce <RUN_URL>` fails asking for a token on a public repo.**
+Downloading Actions logs requires authentication even for public repos —
+GitHub returns `403 Must have admin rights` without it. Any token works for
+public repos (no scopes needed); private repos need a token with repo access.
+Or download the log manually and run `actionrepro ./failure.log` (no network).
+
+**`inspect` works but `reproduce <RUN_URL>` writes nothing.**
+Same cause as above: metadata is public, logs are not. The command fails
+fast with a redacted error instead of writing an empty bundle — set
+`GITHUB_TOKEN` and retry.
+
+**No token, but `gh` is installed?**
+`gh auth login` once — the CLI picks up `gh auth token` automatically
+(`doctor` shows the active token source).
+
+**Can I share the bundle publicly?**
+Redaction is best-effort, not a guarantee — always skim `failure.txt` and
+`repro.json` before attaching a bundle to a public issue.
+
+**Does a local pass prove CI is fixed?**
+No. The bundle replays install + the failing command without CI services,
+caches, artifacts, secrets, or matrix variables. Use `verify` as evidence
+(REPRODUCED / NOT_REPRODUCED), not proof.
+
+**Windows?**
+Use `reproduce.ps1`. The generated scripts ask for confirmation on
+interactive terminals; set `CI_REPRO_YES=1` to skip it in automation.
 
 ## License
 
