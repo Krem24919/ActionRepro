@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Workflow-derived repro commands: when the CI workflow step definition
+  (fetched at the exact run SHA) agrees with the log evidence, the bundle
+  replays the exact CI `run:` script instead of the log fragment — the log
+  stays as evidence. Step lookup is scoped to the failing job (matrix/slice
+  suffixes understood) and also resolves unnamed `run:` steps via their
+  `Run <cmd>` display names. `repro.json → workflow.commandSource` records
+  `workflow` / `log` / `fallback`.
+- `reproduce.ps1` no longer uses `Invoke-Expression`: the command is embedded
+  literally (single evaluation pass, same as `reproduce.sh`), still shown and
+  confirmed before execution.
+- `verify` prints `CI exit code` vs `fresh exit code` alongside the
+  fingerprints.
+
 ## [0.2.0] - 2026-10-06
 
 ### Added

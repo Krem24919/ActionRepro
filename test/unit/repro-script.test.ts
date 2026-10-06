@@ -90,10 +90,13 @@ describe("repro command embedding", () => {
 });
 
 describe("PowerShell script", () => {
-  it("keeps the command verbatim in Invoke-Expression with a gate", () => {
+  it("embeds the command literally with a gate (no Invoke-Expression)", () => {
     const cmd = "npm test && echo hi; ./x.ps1";
     const ps1 = buildReproducePs1(inputFor(cmd));
-    expect(ps1).toContain(`Invoke-Expression "npm test && echo hi; ./x.ps1"`);
+    expect(ps1).toContain(`\n${cmd}\n`);
+    // No eval-style invocation of the command (match the call form, not the
+    // explanatory comment above the command).
+    expect(ps1).not.toMatch(/Invoke-Expression\s*"/);
     expect(ps1).toContain("CI_REPRO_YES");
     expect(ps1).toContain("IsInputRedirected");
     expect(ps1).toContain("exit 4");

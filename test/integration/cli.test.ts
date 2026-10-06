@@ -64,6 +64,8 @@ describe("CLI integration (local fixtures, no network)", () => {
     runCli(["reproduce", fx("npm-fail.log"), "--out", outDir]);
     const out = runCli(["verify", outDir, fx("npm-fail.log")]);
     expect(out).toMatch(/verdict: REPRODUCED/);
+    expect(out).toMatch(/CI exit code: 1/);
+    expect(out).toMatch(/fresh exit code: 1/);
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 

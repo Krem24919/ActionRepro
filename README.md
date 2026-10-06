@@ -156,10 +156,13 @@ Authentication notes (verified against the live GitHub API):
 
 Each bundle also records a **failure fingerprint** (stable hash of ecosystem,
 command, exit code, and normalized error lines) and, for GitHub URLs, the
-**workflow file at the exact run SHA** with a best-effort check whether the
-CI-defined step command agrees with the log evidence. `verify` compares a
-fresh local log against the recorded fingerprint — no probabilities, just
-match / differ / unreadable.
+**workflow file at the exact run SHA**: when the CI-defined step command
+agrees with the log evidence, the bundle replays the exact CI `run:` script
+(the log stays as evidence); otherwise the log-derived command is kept and
+the disagreement is recorded (`repro.json → workflow`, including which
+source won). Step lookup is scoped to the failing job, so repeat step names
+in other jobs can't mislead it. `verify` compares a fresh local log against
+the recorded fingerprint — no probabilities, just match / differ / unreadable.
 
 The script is ecosystem-aware:
 

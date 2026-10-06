@@ -21,6 +21,8 @@ export interface VerifyResult {
   logFile: string;
   recordedFingerprint: string;
   freshFingerprint: string | null;
+  recordedExitCode: number | null;
+  freshExitCode: number | null;
   recordedSummary?: string;
   freshSummary?: string;
   reason: string;
@@ -64,6 +66,8 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
       logFile: input.logFile,
       recordedFingerprint: recorded,
       freshFingerprint: null,
+      recordedExitCode: meta.failure?.exitCode ?? null,
+      freshExitCode: null,
       recordedSummary: meta.failure?.summary,
       reason: `Fresh log not found: ${input.logFile}. Re-run the repro command and save its output first.`,
     };
@@ -79,6 +83,8 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
       logFile: input.logFile,
       recordedFingerprint: recorded,
       freshFingerprint: null,
+      recordedExitCode: meta.failure?.exitCode ?? null,
+      freshExitCode: failure.exitCode ?? null,
       recordedSummary: meta.failure?.summary,
       freshSummary: failure.summary,
       reason: "No failure content found in the fresh log.",
@@ -97,6 +103,8 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
     logFile: input.logFile,
     recordedFingerprint: cmp.recordedFingerprint,
     freshFingerprint: cmp.freshFingerprint,
+    recordedExitCode: meta.failure?.exitCode ?? null,
+    freshExitCode: failure.exitCode ?? null,
     recordedSummary: meta.failure?.summary,
     freshSummary: failure.summary,
     reason: cmp.reason,
@@ -110,6 +118,8 @@ export function formatVerifyHuman(r: VerifyResult): string {
     `  fresh log: ${r.logFile}`,
     `  recorded fingerprint: ${r.recordedFingerprint || "(none)"}`,
     `  fresh fingerprint: ${r.freshFingerprint ?? "(none)"}`,
+    `  CI exit code: ${r.recordedExitCode ?? "(unknown)"}`,
+    `  fresh exit code: ${r.freshExitCode ?? "(unknown)"}`,
     r.recordedSummary ? `  recorded: ${r.recordedSummary}` : null,
     r.freshSummary ? `  fresh: ${r.freshSummary}` : null,
     `  verdict: ${r.verdict}`,

@@ -120,8 +120,13 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
   const failure = extractFailure(lines, { failingJob, failingStep });
   const eco = detectEcosystem(lines, localProjectFiles());
   const runtime = detectRuntime(lines);
-  const reproCommand = failure.reproCommand ?? eco.testCommand;
+  let reproCommand = failure.reproCommand ?? eco.testCommand;
+  let commandSource: "workflow" | "log" | "fallback" = failure.reproCommand
+    ? "log"
+    : "fallback";
   // Best-effort cross-check against the workflow definition at the exact SHA.
+  // When the CI-defined step command agrees with the log evidence, the
+  // workflow text becomes the repro source and the log stays as evidence.
   let workflow: BundleInput["workflow"];
   if (fetched.run.headSha && failingStep) {
     const wf = await fetchWorkflowFile(
@@ -132,12 +137,18 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
       token,
     );
     if (wf) {
-      const step = extractStepScript(wf.text, failingStep);
+      const step = extractStepScript(wf.text, failingStep, failingJob);
+      const agree = step ? commandsAgree(step.script, reproCommand) : null;
+      if (agree === true && step?.script.trim()) {
+        reproCommand = step.script;
+        commandSource = "workflow";
+      }
       workflow = {
         path: wf.path,
         sha: wf.sha,
         stepCommand: step?.script,
-        agree: step ? commandsAgree(step.script, reproCommand) : null,
+        agree,
+        commandSource,
       };
     }
   }
@@ -156,6 +167,7 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
       runtime,
       failure: {
         ...failure,
+        reproCommand,
         failingJob: failure.failingJob ?? failingJob,
         failingStep: failure.failingStep ?? failingStep,
       },
