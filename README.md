@@ -1,7 +1,7 @@
 # ActionRepro
 
 <p align="center">
-  <img src="assets/logo.png" alt="ActionRepro logo — reproduce CI failures locally" width="320" />
+  <img src="assets/logo.png" alt="ActionRepro logo — reproduce CI failures locally" width="640" />
 </p>
 
 [![CI](https://github.com/Krem24919/ActionRepro/actions/workflows/ci.yml/badge.svg)](https://github.com/Krem24919/ActionRepro/actions/workflows/ci.yml)
