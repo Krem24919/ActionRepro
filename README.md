@@ -157,7 +157,8 @@ Authentication notes (verified against the live GitHub API):
 | `bundle.sha256`   | Integrity hash over the bundle content files                      |
 
 Each bundle also records a **failure fingerprint** (stable hash of ecosystem,
-command, exit code, and normalized error lines) and, for GitHub URLs, the
+command, exit code, error kind, and the failure anchor line — the single most
+diagnostic line, never a context window) and, for GitHub URLs, the
 **workflow file at the exact run SHA**: when the CI-defined step command
 agrees with the log evidence, the bundle replays the exact CI `run:` script
 (the log stays as evidence); otherwise the log-derived command is kept and
@@ -210,8 +211,23 @@ ActionRepro verification
 Exit codes are CI-friendly: `0` = REPRODUCED, `1` = NOT_REPRODUCED,
 `2` = INCONCLUSIVE (bundle or log unreadable). Add `--json` for the
 machine-readable form. The comparison is a stable hash over ecosystem,
-command, exit code, and normalized error lines — no probabilities, just
-match / differ / unreadable.
+command, exit code, error kind, and the failure anchor line — no
+probabilities, just match / differ / unreadable.
+
+Verdicts in practice:
+
+- `REPRODUCED` — the fresh log contains the same failure anchor.
+- `NOT_REPRODUCED` — either a different failure, **or no failure at all**
+  (the command exited 0: that is what "my fix worked" looks like).
+- `INCONCLUSIVE` — the fresh log is missing/empty/unreadable, or the bundle
+  was created before 0.3.0 (older fingerprints hashed a context window and
+  cannot be compared with the current algorithm — re-create the bundle).
+
+Lines that the bundle's own script prints start with `==> [actionrepro]` and
+are ignored during comparison, so piping the script's output into the fresh
+log is safe — the script's own summary can never make a fixed run look
+reproduced. The script's last line, `result: exit_code=N`, is the exit code
+`verify` records for the re-run.
 
 ## Coding agents (MCP)
 
@@ -303,8 +319,8 @@ CI dogfoods it on every push (`.github/workflows/dogfood.yml`).
 
 ## How failure extraction works (no LLM)
 
-1. Normalize lines (strip ANSI + `2024-…Z` timestamps).
-2. Score each line against weighted error patterns (`Process completed with exit code N`, `##[error]`, `npm ERR!`, `FAILED/FAIL`, tracebacks, `error[E…]`, `panic:`, …). Highest weight wins; ties go to the last occurrence.
+1. Normalize lines (strip ANSI + `2024-…Z` timestamps) and drop the bundle's own `==> [actionrepro]` frame.
+2. Score each line against weighted error patterns (tracebacks, `error[E…]`, `panic:`, `not ok N`, `ERR_PNPM_…`, `FAILED/FAIL`, `npm ERR!`, …). The runner's own restatements — `Process completed with exit code N`, `npm ERR! Exit status`/`code ELIFECYCLE`/`errno` — are bookkeeping: they supply the exit code and only become the anchor when nothing better matched. Highest weight wins; ties go to the last occurrence.
 3. Walk backwards for the nearest `Run <cmd>` / `$ <cmd>` (or `npm/pnpm/yarn/pytest/cargo/go` invocation) as the repro command.
 4. Detect ecosystem from `Run …` lines + error signatures + local manifest names.
 5. Detect runtime versions from `setup-node/python/go`, `rustc`, `go version`, `Operating System:` lines.

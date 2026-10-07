@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.0] - 2026-10-07
+
+### Fixed
+
+- **`verify` now works on the loop the README documents.** Running the bundle
+  and piping its output into `verify` used to report `NOT_REPRODUCED` for a
+  perfectly reproduced failure — and the same verdict whether the bug was
+  fixed or not. Two causes: the generated script echoed the CI failure text
+  into the fresh log (extraction then anchored on that echo, so the bundle
+  "verified" itself), and the fingerprint hashed a ±8-line context window,
+  which can never be identical between a CI runner and a local re-run.
+- **Failure summaries name the actual error.** The runner's
+  `##[error]Process completed with exit code 1.` is the last line of every
+  failed step and used to outrank the real diagnostic, so every bundle summary
+  read `Failure: ##[error]Process completed with exit code 1.` Runner
+  restatements (`Process completed with exit code N`, `npm ERR! Exit status`,
+  `npm ERR! code ELIFECYCLE`, `errno`, wrapper-script echoes) are now
+  bookkeeping: they provide the exit code and are only used as the anchor when
+  nothing else matched. Fixtures now summarize as
+  `AssertionError: expected 3 to equal 4`, `error[E0308]: mismatched types`,
+  `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`, `add_test.go:10: got 3, want 4`.
+- A fresh log with no failure evidence (the command exited 0) is reported as
+  `NOT_REPRODUCED` with a plain reason instead of being fingerprinted from its
+  last line.
+- `npm test` no longer fails on a machine without outbound network: the
+  `doctor` integration test tolerates an unreachable `api.github.com` while
+  still requiring the toolchain checks to pass.
+
+### Changed
+
+- Failure history (Phase 2) records the fingerprint algorithm per entry
+  (`fpv`). A fingerprint only compares within one algorithm, so `history stats`
+  counts entries written by an older generation and `history --lookup X` says
+  so explicitly when a fingerprint was never recorded, instead of implying
+  "never seen before". `history --record-log` now derives the same anchor as
+  `reproduce`, so both produce identical fingerprints for the same log.
+- Failure fingerprints are now `sha256-v2`: the hash covers ecosystem, command,
+  exit code, error kind, and the failure **anchor line** instead of a context
+  window, so the same failure hashes the same in CI and locally. `repro.json`
+  records `fingerprintVersion`; verifying a bundle created before 0.3.0 is
+  `INCONCLUSIVE` with a "re-create the bundle" message rather than a wrong
+  verdict.
+- All status lines printed by generated scripts are prefixed with
+  `==> [actionrepro]` and are ignored during extraction. The script ends with a
+  machine-readable `result: exit_code=N` line.
+- The failure anchor, its pattern label (`errorKind`), and `matched` are part of
+  the extracted failure, the library exports, and the MCP `fingerprint` tool.
+
 ## [Unreleased]
 
 ### Added

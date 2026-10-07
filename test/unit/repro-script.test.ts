@@ -21,7 +21,14 @@ function inputFor(reproCommand: string, summary = "Failure: boom"): BundleInput 
       runHint: "h",
     },
     runtime: {},
-    failure: { summary, errorLines: ["boom"], reproCommand, hint: "h" },
+    failure: {
+      summary,
+      errorLines: ["boom"],
+      reproCommand,
+      hint: "h",
+      matched: true,
+      anchor: "boom",
+    },
     redactedLogs: "boom",
     redactions: 0,
     fingerprint: fingerprintFailure({
@@ -49,7 +56,7 @@ describe("repro command embedding", () => {
 
   it("shows an escaped (not executable) copy in the display line", () => {
     const sh = buildReproduceSh(inputFor("make test FOO=$(bar)"));
-    expect(sh).toContain("==> running: make test FOO=\\$(bar)");
+    expect(sh).toContain("==> [actionrepro] running: make test FOO=\\$(bar)");
   });
 
   it("deliberately skips bare `Run echo ...` lines (not real commands)", () => {

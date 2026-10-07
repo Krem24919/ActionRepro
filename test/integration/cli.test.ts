@@ -99,8 +99,21 @@ describe("CLI integration (local fixtures, no network)", () => {
     expect(out).toMatch(/REPRODUCED/);
   });
 
-  it("doctor passes required checks", () => {
-    const out = runCli(["doctor"]);
-    expect(out).toMatch(/doctor:/);
+  it("doctor passes every required check that does not depend on the network", () => {
+    // doctor treats api.github.com reachability as required, which is correct
+    // for the tool but would make `npm test` fail on an offline machine or in
+    // a sandbox that blocks the runner's log host. Toolchain checks must pass;
+    // only the network check may fail here.
+    try {
+      const out = runCli(["doctor"]);
+      expect(out).toMatch(/doctor: all required checks passed/);
+    } catch (e: unknown) {
+      const out = String((e as { stdout?: unknown }).stdout ?? "");
+      expect(out).toMatch(/doctor:/);
+      const failedRequired = out
+        .split("\n")
+        .filter((l) => l.includes("FAIL") && !l.includes("network(api.github.com)"));
+      expect(failedRequired).toEqual([]);
+    }
   }, 20000);
 });

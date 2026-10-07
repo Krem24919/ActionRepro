@@ -10,7 +10,7 @@ import { loadLogsFromFile } from "../core/logs.js";
 import { redactText } from "../core/redact.js";
 import { extractFailure } from "../core/extract.js";
 import { detectEcosystem } from "../core/ecosystems.js";
-import { fingerprintFailure } from "../core/fingerprint.js";
+import { FINGERPRINT_ALGO, fingerprintFailure } from "../core/fingerprint.js";
 import {
   appendHistory,
   historyStats,
@@ -52,11 +52,13 @@ export function recordLog(
   const reproCommand = failure.reproCommand ?? eco.testCommand;
   return appendHistory(resolveHistoryFile(historyFile), {
     kind: "failure",
+    fpv: FINGERPRINT_ALGO,
     fingerprint: fingerprintFailure({
       ecosystem: eco.id,
       reproCommand,
       exitCode: failure.exitCode,
-      errorLines: failure.errorLines,
+      anchor: failure.anchor,
+      errorKind: failure.errorKind,
     }),
     summary: failure.summary,
     ecosystem: eco.id,
@@ -68,6 +70,7 @@ export function recordLog(
 
 interface StoredBundle {
   fingerprint?: string;
+  fingerprintVersion?: string;
   ecosystem?: string;
   failure?: {
     summary?: string;
@@ -96,6 +99,7 @@ export function recordBundle(
   }
   return appendHistory(resolveHistoryFile(historyFile), {
     kind: "failure",
+    fpv: meta.fingerprintVersion ?? undefined,
     fingerprint: meta.fingerprint,
     summary: meta.failure?.summary,
     ecosystem: meta.ecosystem,
@@ -125,11 +129,18 @@ export function lookup(
   if (!fingerprint || fingerprint.trim() === "") {
     throw new Error("Cannot look up history: fingerprint is empty.");
   }
-  return lookupHistory(resolveHistoryFile(historyFile), fingerprint.trim());
+  const file = resolveHistoryFile(historyFile);
+  const result = lookupHistory(file, fingerprint.trim());
+  // Nothing recorded for this fingerprint: if the file holds entries from an
+  // older fingerprint algorithm, say so instead of implying "never seen".
+  if (result.failures === 0 && result.fixedCount === 0) {
+    result.legacyEntries = historyStats(file, 0, FINGERPRINT_ALGO).legacyEntries;
+  }
+  return result;
 }
 
 export function stats(historyFile: string | undefined): HistoryStats {
-  return historyStats(resolveHistoryFile(historyFile));
+  return historyStats(resolveHistoryFile(historyFile), 5, FINGERPRINT_ALGO);
 }
 
 export function formatLookupHuman(l: HistoryLookup): string {
@@ -143,6 +154,12 @@ export function formatLookupHuman(l: HistoryLookup): string {
     `  last fixed: ${l.lastFixed ?? "(never)"}`,
     `  still failing: ${l.stillFailing ? "yes" : "no"}`,
   ];
+  if (l.legacyEntries > 0) {
+    lines.push(
+      `  note: ${l.legacyEntries} entr${l.legacyEntries === 1 ? "y" : "ies"} for this fingerprint` +
+        ` ${l.legacyEntries === 1 ? "was" : "were"} recorded with a different fingerprint algorithm`,
+    );
+  }
   if (l.changes.length > 0) {
     lines.push("  changed between first and last occurrence:");
     for (const c of l.changes) lines.push(`    - ${c}`);
@@ -161,6 +178,9 @@ export function formatStatsHuman(s: HistoryStats): string {
     `  last seen: ${s.lastSeen ?? "(none)"}`,
   ];
   if (s.corruptLines > 0) lines.push(`  corrupt lines skipped: ${s.corruptLines}`);
+  if (s.legacyEntries > 0) {
+    lines.push(`  legacy entries (different fingerprint algorithm): ${s.legacyEntries}`);
+  }
   if (s.top.length > 0) {
     lines.push("  most frequent:");
     for (const t of s.top) {

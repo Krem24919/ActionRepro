@@ -23,6 +23,13 @@ export interface HistoryEntry {
   ts: string;
   kind: HistoryKind;
   fingerprint: string;
+  /**
+   * Fingerprint algorithm that produced `fingerprint` (absent on entries
+   * written before 0.3.0, i.e. sha256-v1). Fingerprints are only comparable
+   * within one algorithm, so mismatched entries are counted and reported
+   * instead of silently never matching again.
+   */
+  fpv?: string;
   summary?: string;
   ecosystem?: string;
   reproCommand?: string;
@@ -32,6 +39,7 @@ export interface HistoryEntry {
 
 export interface RecordInput {
   fingerprint: string;
+  fpv?: string;
   kind?: HistoryKind;
   summary?: string;
   ecosystem?: string;
@@ -72,6 +80,7 @@ export function appendHistory(file: string, input: RecordInput): HistoryEntry {
     kind: input.kind ?? "failure",
     fingerprint: input.fingerprint,
   };
+  if (input.fpv !== undefined) entry.fpv = input.fpv;
   if (input.summary !== undefined) entry.summary = input.summary;
   if (input.ecosystem !== undefined) entry.ecosystem = input.ecosystem;
   if (input.reproCommand !== undefined) entry.reproCommand = input.reproCommand;
@@ -115,6 +124,13 @@ export interface HistoryLookup {
   stillFailing: boolean;
   /** Human-readable field changes between first and last failure occurrence. */
   changes: string[];
+  /**
+   * Number of entries in the file recorded with a different fingerprint
+   * algorithm. Populated by the command layer only when this fingerprint had
+   * no occurrences at all, where "the history was written by another
+   * algorithm generation" is the useful explanation.
+   */
+  legacyEntries: number;
   occurrences: HistoryEntry[];
 }
 
@@ -161,6 +177,7 @@ export function lookupHistory(file: string, fingerprint: string): HistoryLookup 
       firstFailure && lastFailure && firstFailure !== lastFailure
         ? diffEntries(firstFailure, lastFailure)
         : [],
+    legacyEntries: 0,
     occurrences: mine,
   };
 }
@@ -173,11 +190,22 @@ export interface HistoryStats {
   firstSeen: string | null;
   lastSeen: string | null;
   corruptLines: number;
+  /**
+   * Entries recorded with a different fingerprint algorithm than the current
+   * one. They are kept (history is append-only) but cannot match a fresh
+   * fingerprint, so callers should tell the user instead of showing a mystery
+   * "never seen before" for a failure they recorded yesterday.
+   */
+  legacyEntries: number;
   top: Array<{ fingerprint: string; failures: number; summary?: string }>;
 }
 
-export function historyStats(file: string, topN = 5): HistoryStats {
+export function historyStats(file: string, topN = 5, currentAlgo?: string): HistoryStats {
   const { entries, corrupt } = readHistory(file);
+  const legacyEntries =
+    currentAlgo === undefined
+      ? 0
+      : entries.filter((e) => (e.fpv ?? "") !== currentAlgo).length;
   const failures = entries.filter((e) => e.kind === "failure");
   const byFp = new Map<string, HistoryEntry[]>();
   for (const e of failures) {
@@ -202,6 +230,7 @@ export function historyStats(file: string, topN = 5): HistoryStats {
     firstSeen: allTs[0] ?? null,
     lastSeen: allTs.at(-1) ?? null,
     corruptLines: corrupt,
+    legacyEntries,
     top,
   };
 }
