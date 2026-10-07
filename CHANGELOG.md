@@ -8,9 +8,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 - MCP server (`actionrepro mcp`): stdio JSON-RPC interface (MCP 2025-11-25,
   older versions negotiated) exposing `inspect`, `reproduce`, `verify`,
-  `fingerprint`, and `doctor` as agent tools with structured JSON results.
-  Zero new dependencies. `reproduce` defaults to files-only; `run:true`
-  executes only with the principal's approval.
+  `fingerprint`, `doctor`, and `history` as agent tools with structured
+  JSON results. Zero new dependencies. `reproduce` defaults to files-only;
+  `run:true` executes only with the principal's approval.
+- Failure history (`actionrepro history`, MCP `history` tool): append-only
+  JSONL log (`~/.actionrepro/history.jsonl` by default) keyed by
+  fingerprint. Answers same-as-before, occurrence counts, first/last seen,
+  fixes, and what changed between occurrences. Record from a log file or
+  an existing bundle; noisy-log tolerant (timestamps/versions ignored).
 
 ### Fixed
 

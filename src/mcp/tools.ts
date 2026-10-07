@@ -21,6 +21,13 @@ import { redactText } from "../core/redact.js";
 import { extractFailure } from "../core/extract.js";
 import { detectEcosystem } from "../core/ecosystems.js";
 import { fingerprintFailure } from "../core/fingerprint.js";
+import {
+  lookup as historyLookup,
+  markFixed as historyMarkFixed,
+  recordBundle as historyRecordBundle,
+  recordLog as historyRecordLog,
+  stats as historyStats,
+} from "../commands/history.js";
 
 export interface TextBlock {
   type: "text";
@@ -155,6 +162,35 @@ async function handleDoctor(args: Record<string, unknown>): Promise<ToolResult> 
   return ok(await doctor());
 }
 
+type HistoryAction = "lookup" | "stats" | "record_log" | "record_bundle" | "mark_fixed";
+
+async function handleHistory(args: Record<string, unknown>): Promise<ToolResult> {
+  const action = args["action"];
+  if (
+    action !== "lookup" &&
+    action !== "stats" &&
+    action !== "record_log" &&
+    action !== "record_bundle" &&
+    action !== "mark_fixed"
+  ) {
+    throw new ToolError(
+      `"action" must be one of: lookup, stats, record_log, record_bundle, mark_fixed.`,
+    );
+  }
+  const historyFile = optStr(args, "historyFile");
+  const a: HistoryAction = action;
+  if (a === "stats") return ok(historyStats(historyFile));
+  if (a === "lookup") return ok(historyLookup(historyFile, needStr(args, "fingerprint")));
+  if (a === "mark_fixed")
+    return ok(historyMarkFixed(historyFile, needStr(args, "fingerprint")));
+  if (a === "record_log") {
+    return ok(
+      historyRecordLog(historyFile, needStr(args, "logFile"), optStr(args, "source")),
+    );
+  }
+  return ok(historyRecordBundle(historyFile, needStr(args, "bundleDir")));
+}
+
 export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "inspect",
@@ -252,6 +288,48 @@ export const MCP_TOOLS: McpToolDef[] = [
       "Call this when runs fail for environmental reasons or before starting a reproduce/verify loop.",
     inputSchema: { type: "object", properties: {} },
     handler: handleDoctor,
+  },
+  {
+    name: "history",
+    description:
+      "Failure history across runs, keyed by fingerprint. Actions: " +
+      "lookup (occurrences, first/last seen, fixes, still-failing, what changed), " +
+      "stats (whole-log summary with most frequent failures), " +
+      "record_log (fingerprint a log file and store it as a failure), " +
+      "record_bundle (store an existing bundle's fingerprint as a failure), " +
+      "mark_fixed (record that a fingerprint was fixed). " +
+      "Use lookup to answer 'is this the same failure as before?' before re-investigating.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          description: "One of: lookup, stats, record_log, record_bundle, mark_fixed.",
+        },
+        fingerprint: {
+          type: "string",
+          description: "Required for lookup and mark_fixed.",
+        },
+        logFile: {
+          type: "string",
+          description: "Required for record_log: local failure log path.",
+        },
+        bundleDir: {
+          type: "string",
+          description: "Required for record_bundle: existing bundle directory.",
+        },
+        source: {
+          type: "string",
+          description: "Optional source label for record_log.",
+        },
+        historyFile: {
+          type: "string",
+          description: "History file path. Default ~/.actionrepro/history.jsonl.",
+        },
+      },
+      required: ["action"],
+    },
+    handler: handleHistory,
   },
 ];
 

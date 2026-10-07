@@ -216,9 +216,9 @@ match / differ / unreadable.
 ## Coding agents (MCP)
 
 `actionrepro mcp` speaks the Model Context Protocol over stdio (spec
-2025-11-25; older versions negotiated), exposing five tools with structured
-JSON results: `inspect`, `reproduce`, `verify`, `fingerprint`, `doctor`.
-Same functions as the CLI — agents and humans can never disagree about what
+2025-11-25; older versions negotiated), exposing six tools with structured
+JSON results: `inspect`, `reproduce`, `verify`, `fingerprint`, `doctor`,
+`history`. Same functions as the CLI — agents and humans can never disagree about what
 a failure means.
 
 Claude Code (project `.mcp.json`, or `claude mcp add actionrepro -- node
@@ -235,8 +235,10 @@ Claude Code (project `.mcp.json`, or `claude mcp add actionrepro -- node
 }
 ```
 
-Suggested agent loop: `inspect` the failure → `reproduce` it into a bundle
-→ edit code → re-run the bundle command → `verify` the fresh log.
+Suggested agent loop: `history lookup` to check whether this failure is
+already known → `inspect` the failure → `reproduce` it into a bundle
+→ edit code → re-run the bundle command → `verify` the fresh log
+(`mark_fixed` when it stays green).
 `reproduce` defaults to files-only; pass `run: true` only with the user's
 explicit approval (MCP sessions are non-interactive, so the terminal
 confirmation gate is skipped there). Tokens go only to `api.github.com`
@@ -315,9 +317,9 @@ Same input → same output. Fixtures live in [`fixtures/logs/`](fixtures/logs/).
 src/
   cli.ts                 # commander wiring (default/inspect/reproduce/doctor/verify/mcp)
   index.ts               # public library exports
-  commands/              # inspect.ts reproduce.ts doctor.ts verify.ts
+  commands/              # inspect.ts reproduce.ts doctor.ts verify.ts history.ts
   mcp/                   # protocol.ts tools.ts server.ts (MCP stdio server, zero deps)
-  core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts fingerprint.ts workflow.ts
+  core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts fingerprint.ts workflow.ts history.ts
   providers/             # types.ts (CiProvider) + github-actions.ts
   ecosystems/            # adapters.ts + registry.ts + types.ts (per-ecosystem behavior)
   utils/                 # fs.ts log.ts version.ts
