@@ -131,7 +131,8 @@ async function handleFingerprint(args: Record<string, unknown>): Promise<ToolRes
     ecosystem: eco.id,
     reproCommand: failure.reproCommand ?? eco.testCommand,
     exitCode: failure.exitCode,
-    errorLines: failure.errorLines,
+    anchor: failure.anchor,
+    errorKind: failure.errorKind,
   });
   const MAX_LINES = 20;
   return ok({

@@ -3,6 +3,15 @@ import { createHash } from "node:crypto";
 /**
  * Failure fingerprints: stable identities for "the same failure".
  *
+ * A fingerprint is a sha256 over a small, canonical signature:
+ *
+ *   ecosystem + command + exit code + error kind + the failure anchor line
+ *
+ * The anchor is the single most diagnostic line of the failure (e.g.
+ * `AssertionError: expected 3 to equal 4`), never a context window: windows
+ * differ between CI and a local re-run (different surrounding lines, runner
+ * bookkeeping), which made "same failure in CI and locally" hash differently.
+ *
  * Normalization removes run-specific noise (timestamps, ANSI codes, temp
  * paths, durations, memory addresses, absolute workspace paths) while KEEPING
  * semantically meaningful values (exit codes, assertion values, error types,
@@ -10,13 +19,18 @@ import { createHash } from "node:crypto";
  * different failure -> different hash. No probabilities, no guessing.
  */
 
-export const FINGERPRINT_ALGO = "sha256-v1";
+export const FINGERPRINT_ALGO = "sha256-v2";
 
 export interface FingerprintInput {
   ecosystem: string;
   reproCommand?: string;
   exitCode?: number;
-  errorLines: string[];
+  /** The winning diagnostic line (preferred). */
+  anchor?: string;
+  /** Pattern label of the anchor, e.g. "npm error", "assertion error". */
+  errorKind?: string;
+  /** Context lines; used only to derive an anchor when `anchor` is absent. */
+  errorLines?: string[];
 }
 
 export function normalizeFailureLine(line: string): string {
@@ -43,17 +57,34 @@ export function normalizeFailureLine(line: string): string {
   return s.trim();
 }
 
-export function fingerprintFailure(input: FingerprintInput): string {
-  const canonical = [
+/** First line of a command, whitespace-collapsed: the part that identifies it. */
+export function canonicalCommand(command: string | undefined): string {
+  const first = (command ?? "").split("\n")[0]?.trim() ?? "";
+  return first.replace(/\s+/g, " ");
+}
+
+function anchorOf(input: FingerprintInput): string {
+  if (input.anchor && input.anchor.trim() !== "") return input.anchor;
+  const fallback = (input.errorLines ?? []).find((l) => l.trim() !== "");
+  return fallback ?? "";
+}
+
+/** The canonical signature string a fingerprint is hashed from (also used in reasons). */
+export function failureSignature(input: FingerprintInput): string {
+  return [
     `ecosystem=${input.ecosystem}`,
-    `command=${(input.reproCommand ?? "").trim()}`,
+    `command=${canonicalCommand(input.reproCommand)}`,
     `exit=${input.exitCode ?? "unknown"}`,
-    ...input.errorLines
-      .slice(0, 20)
-      .map(normalizeFailureLine)
-      .filter((l) => l !== ""),
+    `kind=${input.errorKind ?? "unknown"}`,
+    `anchor=${normalizeFailureLine(anchorOf(input))}`,
   ].join("\n");
-  return createHash("sha256").update(canonical, "utf8").digest("hex").slice(0, 16);
+}
+
+export function fingerprintFailure(input: FingerprintInput): string {
+  return createHash("sha256")
+    .update(failureSignature(input), "utf8")
+    .digest("hex")
+    .slice(0, 16);
 }
 
 export type VerifyVerdict = "REPRODUCED" | "NOT_REPRODUCED" | "INCONCLUSIVE";

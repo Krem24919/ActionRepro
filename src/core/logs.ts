@@ -42,3 +42,16 @@ export function normalizeLine(line: string): string {
 export function normalizedLines(lines: string[]): string[] {
   return lines.map(normalizeLine);
 }
+
+/**
+ * Marker every generated bundle prints on its own status lines:
+ * `==> [actionrepro] ...`. Extraction ignores those lines: the script echoes
+ * the CI failure text for context, and without this filter a fresh run would
+ * "verify" itself from the echo alone (the recorded anchor would appear in
+ * the new log even when nothing failed).
+ */
+export const ACTIONREPRO_FRAME_RE = /^\s*==>\s*\[actionrepro\]/;
+
+export function isActionReproFrame(line: string): boolean {
+  return ACTIONREPRO_FRAME_RE.test(line);
+}

@@ -11,7 +11,14 @@ let tmp = "";
 let stubBin = "";
 
 function bundleInput(reproCommand: string, summary = "Failure: boom"): BundleInput {
-  const failure = { summary, errorLines: ["boom"], reproCommand, hint: "h" };
+  const failure = {
+    summary,
+    errorLines: ["boom"],
+    reproCommand,
+    hint: "h",
+    matched: true,
+    anchor: "boom",
+  };
   return {
     sourceDisplay: "fixtures/logs/x.log",
     ecosystem: {

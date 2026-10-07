@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ensureDir } from "../utils/fs.js";
 import { redactText } from "./redact.js";
-import { hashBundleFiles } from "./fingerprint.js";
+import { hashBundleFiles, FINGERPRINT_ALGO } from "./fingerprint.js";
 import type { EcosystemInfo } from "./ecosystems.js";
 import type { FailureInfo } from "./extract.js";
 import type { RuntimeInfo } from "./runtime.js";
@@ -137,8 +137,8 @@ export function buildReproduceSh(input: BundleInput): string {
   const cmdDisplay = shText(cmd);
   const ciExit =
     input.failure.exitCode !== undefined
-      ? `echo "==> CI exit code: ${input.failure.exitCode}"`
-      : `echo "==> CI exit code: unknown"`;
+      ? `echo "==> [actionrepro] CI exit code: ${input.failure.exitCode}"`
+      : `echo "==> [actionrepro] CI exit code: unknown"`;
   const installLines = installBlock(input.ecosystem)
     .split("\n")
     .map((l) => (l.trim() === "" ? l : `  ${l} || exit $?`))
@@ -154,15 +154,19 @@ export function buildReproduceSh(input: BundleInput): string {
 # Exit codes: 3 = dependency setup failed (environment problem, not a repro),
 #   4 = aborted at the confirmation prompt, anything else = the repro
 #   command's own exit code.
+# All status lines this script prints are prefixed with "==> [actionrepro]".
+# actionrepro verify ignores those lines, so piping this output into a log file
+# cannot make the script's own summary look like a new failure. The final
+# "result: exit_code=N" line reports the command's exit code.
 set -euo pipefail
 
-echo "==> actionrepro: ecosystem=${ecoLine}"
-echo "==> evidence: ${evidence}"
-echo "==> failure: ${summary}"
+echo "==> [actionrepro] ecosystem=${ecoLine}"
+echo "==> [actionrepro] evidence: ${evidence}"
+echo "==> [actionrepro] failure: ${summary}"
 ${ciExit}
 echo ""
-echo "==> command to run: ${cmdDisplay}"
-echo "==> WARNING: this command came from CI output (untrusted). Review it, then confirm."
+echo "==> [actionrepro] command to run: ${cmdDisplay}"
+echo "==> [actionrepro] WARNING: this command came from CI output (untrusted). Review it, then confirm."
 if [ "\${CI_REPRO_YES:-}" != "1" ] && [ -t 0 ]; then
   printf "Run it now? [y/N] "
   ACTIONREPRO_ANSWER=""
@@ -178,31 +182,33 @@ fi
 unset ACTIONREPRO_ANSWER
 
 echo ""
-echo "==> Step 1/2: install dependencies"
+echo "==> [actionrepro] Step 1/2: install dependencies"
 INSTALL_RC=0
 (
 ${installLines}
 ) || INSTALL_RC=$?
 if [ "$INSTALL_RC" -ne 0 ]; then
-  echo "==> INSTALL_FAILED: dependency setup exited with code $INSTALL_RC." >&2
-  echo "==> This is an environment problem, NOT a reproduction of the CI failure." >&2
-  echo "==> Fix your toolchain/dependencies (see messages above) and re-run this script." >&2
+  echo "==> [actionrepro] INSTALL_FAILED: dependency setup exited with code $INSTALL_RC." >&2
+  echo "==> [actionrepro] This is an environment problem, NOT a reproduction of the CI failure." >&2
+  echo "==> [actionrepro] Fix your toolchain/dependencies (see messages above) and re-run this script." >&2
   exit 3
 fi
-echo "==> dependencies ready"
+echo "==> [actionrepro] dependencies ready"
 
 echo ""
-echo "==> Step 2/2: reproduce failure"
-echo "==> running: ${cmdDisplay}"
+echo "==> [actionrepro] Step 2/2: reproduce failure"
+echo "==> [actionrepro] running: ${cmdDisplay}"
 set +e
 ${cmd}
 REPRO_RC=$?
 set -e
 if [ "$REPRO_RC" -ne 0 ]; then
-  echo "==> REPRODUCED: command exited with code $REPRO_RC. Compare it with the CI failure shown above."
+  echo "==> [actionrepro] REPRODUCED: command exited with code $REPRO_RC. Compare it with the CI failure shown above."
+  echo "==> [actionrepro] result: exit_code=$REPRO_RC"
   exit "$REPRO_RC"
 else
-  echo "==> NOT REPRODUCED: command exited 0. The failure may be fixed, flaky, or specific to the CI environment."
+  echo "==> [actionrepro] NOT REPRODUCED: command exited with code 0. The failure may be fixed, flaky, or specific to the CI environment."
+  echo "==> [actionrepro] result: exit_code=0"
 fi
 `;
 }
@@ -224,39 +230,44 @@ export function buildReproducePs1(input: BundleInput): string {
 # Exit codes: 3 = dependency setup failed (environment problem, not a repro),
 #   4 = aborted at the confirmation prompt, anything else = the repro
 #   command's own exit code.
+# All status lines this script prints are prefixed with "==> [actionrepro]".
+# actionrepro verify ignores those lines, so piping this output into a log file
+# cannot make the script's own summary look like a new failure.
 $ErrorActionPreference = "Stop"
-Write-Host "==> actionrepro: ecosystem=${input.ecosystem.id} confidence=${input.ecosystem.confidence}"
-Write-Host "==> evidence: ${evidence}"
-Write-Host "==> failure: ${summary}"
-Write-Host "==> CI exit code: ${(input.failure.exitCode ?? "unknown").toString()}"
+Write-Host "==> [actionrepro] ecosystem=${input.ecosystem.id} confidence=${input.ecosystem.confidence}"
+Write-Host "==> [actionrepro] evidence: ${evidence}"
+Write-Host "==> [actionrepro] failure: ${summary}"
+Write-Host "==> [actionrepro] CI exit code: ${(input.failure.exitCode ?? "unknown").toString()}"
 Write-Host ""
-Write-Host "==> command to run: ${cmdDisplay}"
-Write-Host "==> WARNING: this command came from CI output (untrusted). Review it, then confirm."
+Write-Host "==> [actionrepro] command to run: ${cmdDisplay}"
+Write-Host "==> [actionrepro] WARNING: this command came from CI output (untrusted). Review it, then confirm."
 if ($env:CI_REPRO_YES -ne "1" -and -not [Console]::IsInputRedirected) {
   $answer = Read-Host "Run it now? [y/N]"
   if ($answer -notmatch "^[yY]") { Write-Host "Aborted by user (exit 4)."; exit 4 }
 }
 Write-Host ""
-Write-Host "==> Step 1/2: install dependencies"
+Write-Host "==> [actionrepro] Step 1/2: install dependencies"
 ${installPs}
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "==> INSTALL_FAILED: dependency setup exited with code $LASTEXITCODE."
-  Write-Host "==> This is an environment problem, NOT a reproduction of the CI failure."
+  Write-Host "==> [actionrepro] INSTALL_FAILED: dependency setup exited with code $LASTEXITCODE."
+  Write-Host "==> [actionrepro] This is an environment problem, NOT a reproduction of the CI failure."
   exit 3
 }
-Write-Host "==> dependencies ready"
+Write-Host "==> [actionrepro] dependencies ready"
 Write-Host ""
-Write-Host "==> Step 2/2: reproduce failure"
-Write-Host "==> running: ${cmdDisplay}"
+Write-Host "==> [actionrepro] Step 2/2: reproduce failure"
+Write-Host "==> [actionrepro] running: ${cmdDisplay}"
 # Single evaluation pass on purpose: the lines below execute exactly as shown
 # above after your confirmation. Never wrap this in Invoke-Expression — that
 # would evaluate the text twice (once as an expandable string, once as code).
 ${cmd}
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "==> REPRODUCED: command exited with code $LASTEXITCODE. Compare it with the CI failure shown above."
+  Write-Host "==> [actionrepro] REPRODUCED: command exited with code $LASTEXITCODE. Compare it with the CI failure shown above."
+  Write-Host "==> [actionrepro] result: exit_code=$LASTEXITCODE"
   exit $LASTEXITCODE
 } else {
-  Write-Host "==> NOT REPRODUCED: command exited 0. The failure may be fixed, flaky, or specific to the CI environment."
+  Write-Host "==> [actionrepro] NOT REPRODUCED: command exited with code 0. The failure may be fixed, flaky, or specific to the CI environment."
+  Write-Host "==> [actionrepro] result: exit_code=0"
 }
 `;
 }
@@ -327,6 +338,16 @@ Reproduce scripts ask for confirmation on interactive terminals
 (\`CI_REPRO_YES=1\` skips it). Exit codes from \`reproduce.sh\`: \`3\` =
 dependency setup failed (environment problem, not a reproduction), \`4\` =
 aborted at the prompt, anything else = the repro command's own exit code.
+
+Everything the script prints about itself is prefixed with
+\`==> [actionrepro]\` and ends with \`result: exit_code=N\`. Those lines are
+ignored by \`actionrepro verify\`, so you can safely pipe the whole run into a
+log file and verify it:
+
+\`\`\`bash
+CI_REPRO_YES=1 ./reproduce.sh > ./local-run.log 2>&1
+actionrepro verify . ./local-run.log
+\`\`\`
 
 ## What this does NOT do
 
@@ -445,6 +466,7 @@ export function createBundle(input: BundleInput, outDir: string): BundleResult {
     ecosystemConfidence: input.ecosystem.confidence,
     evidence: input.ecosystem.evidence,
     fingerprint: input.fingerprint,
+    fingerprintVersion: FINGERPRINT_ALGO,
     bundleSha256,
     workflow: input.workflow ?? null,
     failure: {
