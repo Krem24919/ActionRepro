@@ -135,7 +135,9 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
       recordedExitCode,
       freshExitCode: failure.exitCode ?? null,
       recordedSummary: meta.failure?.summary,
-      freshSummary: failure.summary,
+      // No failure was found: the "Unknown failure near ..." fallback line
+      // would only confuse the verdict, so it is not reported as a summary.
+      freshSummary: undefined,
       reason:
         "The fresh log contains no failure evidence (no diagnostic line, and no runner exit marker) — " +
         "the reproduced command did not fail. The CI failure did not reproduce.",
