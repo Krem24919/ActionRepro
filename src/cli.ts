@@ -5,6 +5,15 @@ import { reproduceTarget } from "./commands/reproduce.js";
 import { verifyBundle, formatVerifyHuman } from "./commands/verify.js";
 import { doctor, formatDoctorHuman } from "./commands/doctor.js";
 import { runMcpStdio } from "./mcp/server.js";
+import {
+  lookup as historyLookup,
+  markFixed as historyMarkFixed,
+  recordBundle as historyRecordBundle,
+  recordLog as historyRecordLog,
+  stats as historyStats,
+  formatLookupHuman,
+  formatStatsHuman,
+} from "./commands/history.js";
 import { VERSION } from "./utils/version.js";
 import { redactText } from "./core/redact.js";
 import { sanitizeActionsOutput } from "./utils/log.js";
@@ -113,12 +122,81 @@ program
     await runMcpStdio();
   });
 
+program
+  .command("history")
+  .description("Record and query failure history across runs.")
+  .option("--history-file <file>", "history file (default ~/.actionrepro/history.jsonl)")
+  .option("--lookup <fingerprint>", "show occurrences of a fingerprint")
+  .option("--stats", "summarize the whole history", false)
+  .option("--record-log <file>", "fingerprint a log and record it as a failure")
+  .option("--record-bundle <dir>", "record an existing bundle's fingerprint as a failure")
+  .option("--mark-fixed <fingerprint>", "record a fix for a fingerprint")
+  .option("--source <label>", "source label for --record-log")
+  .option("--json", "print machine-readable JSON", false)
+  .action(
+    async (opts: {
+      historyFile?: string;
+      lookup?: string;
+      stats: boolean;
+      recordLog?: string;
+      recordBundle?: string;
+      markFixed?: string;
+      source?: string;
+      json: boolean;
+    }) => {
+      try {
+        const picked = [
+          opts.lookup && "lookup",
+          opts.stats && "stats",
+          opts.recordLog && "record-log",
+          opts.recordBundle && "record-bundle",
+          opts.markFixed && "mark-fixed",
+        ].filter(Boolean);
+        const action = picked.length === 0 ? "stats" : picked[0];
+        if (picked.length > 1) {
+          throw new Error(
+            `Pick one history action (${picked.join(", ")} given). See --help.`,
+          );
+        }
+        if (action === "lookup") {
+          const r = historyLookup(opts.historyFile, opts.lookup as string);
+          if (opts.json) console.log(JSON.stringify({ ok: true, ...r }, null, 2));
+          else console.log(sanitizeActionsOutput(formatLookupHuman(r)));
+        } else if (action === "stats") {
+          const r = historyStats(opts.historyFile);
+          if (opts.json) console.log(JSON.stringify({ ok: true, ...r }, null, 2));
+          else console.log(sanitizeActionsOutput(formatStatsHuman(r)));
+        } else if (action === "record-log") {
+          const r = historyRecordLog(
+            opts.historyFile,
+            opts.recordLog as string,
+            opts.source,
+          );
+          if (opts.json) console.log(JSON.stringify({ ok: true, entry: r }, null, 2));
+          else console.log(`recorded failure ${r.fingerprint} (${r.ts})`);
+        } else if (action === "record-bundle") {
+          const r = historyRecordBundle(opts.historyFile, opts.recordBundle as string);
+          if (opts.json) console.log(JSON.stringify({ ok: true, entry: r }, null, 2));
+          else console.log(`recorded failure ${r.fingerprint} (${r.ts})`);
+        } else {
+          const r = historyMarkFixed(opts.historyFile, opts.markFixed as string);
+          if (opts.json) console.log(JSON.stringify({ ok: true, entry: r }, null, 2));
+          else console.log(`recorded fix for ${r.fingerprint} (${r.ts})`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));
+        process.exitCode = 1;
+      }
+    },
+  );
+
 // Default shorthand: `actionrepro <url|file> [--out dir] [--run] [--token T] [--json]`
 // Handled manually (not via commander program-action) because a program-level
 // action+options breaks subcommand option parsing in commander.
 // IMPORTANT: every `program.command(...)` name below MUST also appear in
 // KNOWN_SUBCOMMANDS, or the shorthand dispatcher will swallow it as a target.
-const KNOWN_SUBCOMMANDS = ["inspect", "reproduce", "doctor", "verify", "mcp"];
+const KNOWN_SUBCOMMANDS = ["inspect", "reproduce", "doctor", "verify", "mcp", "history"];
 async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
   const first = argv[0];
   if (!first) return false;

@@ -26,6 +26,17 @@ export {
 } from "./core/fingerprint.js";
 export type { VerifyVerdict } from "./core/fingerprint.js";
 export { extractStepScript, commandsAgree } from "./core/workflow.js";
+export { recordLog, recordBundle, markFixed, lookup, stats } from "./commands/history.js";
+export {
+  appendHistory,
+  readHistory,
+  lookupHistory,
+  historyStats,
+  diffEntries,
+  resolveHistoryFile,
+  defaultHistoryFile,
+} from "./core/history.js";
+export type { HistoryEntry, HistoryLookup, HistoryStats } from "./core/history.js";
 export { McpServer, runMcpStdio } from "./mcp/server.js";
 export { MCP_TOOLS } from "./mcp/tools.js";
 export {

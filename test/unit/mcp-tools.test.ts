@@ -23,13 +23,14 @@ function resOf(line: string | null): Record<string, unknown> {
 }
 
 describe("tool catalog", () => {
-  it("exposes exactly the five documented tools in stable order", () => {
+  it("exposes exactly the six documented tools in stable order", () => {
     expect(MCP_TOOLS.map((t) => t.name)).toEqual([
       "inspect",
       "reproduce",
       "verify",
       "fingerprint",
       "doctor",
+      "history",
     ]);
   });
 
@@ -80,6 +81,7 @@ describe("handshake", () => {
       "verify",
       "fingerprint",
       "doctor",
+      "history",
     ]);
   });
 });
@@ -217,5 +219,46 @@ describe("tool calls", () => {
       ),
     );
     expect(JSON.stringify(r)).not.toContain(sentinel);
+  });
+
+  it("answers history lookup/stats/record/mark_fixed without touching HOME", async () => {
+    const s = new McpServer();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-mcphist-"));
+    const historyFile = path.join(dir, "h.jsonl");
+    const call = async (id: number, args: Record<string, unknown>) => {
+      const r = resOf(
+        await s.handleLine(req(id, "tools/call", { name: "history", arguments: args })),
+      );
+      return JSON.parse(
+        (
+          (r["result"] as Record<string, unknown>)["content"] as Array<{ text: string }>
+        )[0].text,
+      ) as Record<string, unknown>;
+    };
+    try {
+      const st0 = await call(20, { action: "stats", historyFile });
+      expect(st0["failureEvents"]).toBe(0);
+      const rec = await call(21, {
+        action: "record_log",
+        logFile: fx("npm-fail.log"),
+        historyFile,
+      });
+      const fp = (rec as Record<string, unknown>)["fingerprint"] as string;
+      expect(fp).toMatch(/^[0-9a-f]{16}$/);
+      const lk = await call(22, { action: "lookup", fingerprint: fp, historyFile });
+      expect(lk["failures"]).toBe(1);
+      expect(lk["stillFailing"]).toBe(true);
+      await call(23, { action: "mark_fixed", fingerprint: fp, historyFile });
+      const lk2 = await call(24, { action: "lookup", fingerprint: fp, historyFile });
+      expect(lk2["stillFailing"]).toBe(false);
+      const bad = resOf(
+        await s.handleLine(
+          req(25, "tools/call", { name: "history", arguments: { action: "lookup" } }),
+        ),
+      );
+      expect((bad["result"] as Record<string, unknown>)["isError"]).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

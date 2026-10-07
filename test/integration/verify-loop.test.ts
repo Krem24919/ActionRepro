@@ -182,3 +182,37 @@ describe("documented verify loop (reproduce -> run -> verify)", () => {
     expect(verify.status).toBe(2);
   });
 });
+
+describe("fingerprints agree across the CLI surface", () => {
+  it("history records the same fingerprint the bundle carries", () => {
+    const bundle = path.join(tmp, "actionrepro");
+    const historyFile = path.join(tmp, "history.jsonl");
+    runCli(["reproduce", "ci-failure.log", "--out", bundle]);
+    runCli(["history", "--record-log", "ci-failure.log", "--history-file", historyFile]);
+
+    const bundleMeta = JSON.parse(
+      fs.readFileSync(path.join(bundle, "repro.json"), "utf8"),
+    ) as { fingerprint: string; fingerprintVersion: string };
+    const entry = JSON.parse(
+      fs.readFileSync(historyFile, "utf8").trim().split("\n")[0] ?? "{}",
+    ) as { fingerprint: string; fpv?: string };
+
+    expect(entry.fingerprint).toBe(bundleMeta.fingerprint);
+    expect(entry.fpv).toBe(bundleMeta.fingerprintVersion);
+  });
+
+  it("stats reports entries written by an older fingerprint algorithm", () => {
+    const historyFile = path.join(tmp, "history.jsonl");
+    fs.writeFileSync(
+      historyFile,
+      `${JSON.stringify({
+        v: 1,
+        ts: new Date().toISOString(),
+        kind: "failure",
+        fingerprint: "deadbeefdeadbeef",
+      })}\n`,
+    );
+    const out = runCli(["history", "--stats", "--history-file", historyFile]).out;
+    expect(out).toMatch(/legacy entries \(different fingerprint algorithm\): 1/);
+  });
+});

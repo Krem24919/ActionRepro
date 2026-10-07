@@ -32,6 +32,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- Failure history (Phase 2) records the fingerprint algorithm per entry
+  (`fpv`). A fingerprint only compares within one algorithm, so `history stats`
+  counts entries written by an older generation and `history --lookup X` says
+  so explicitly when a fingerprint was never recorded, instead of implying
+  "never seen before". `history --record-log` now derives the same anchor as
+  `reproduce`, so both produce identical fingerprints for the same log.
 - Failure fingerprints are now `sha256-v2`: the hash covers ecosystem, command,
   exit code, error kind, and the failure **anchor line** instead of a context
   window, so the same failure hashes the same in CI and locally. `repro.json`
@@ -50,9 +56,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 - MCP server (`actionrepro mcp`): stdio JSON-RPC interface (MCP 2025-11-25,
   older versions negotiated) exposing `inspect`, `reproduce`, `verify`,
-  `fingerprint`, and `doctor` as agent tools with structured JSON results.
-  Zero new dependencies. `reproduce` defaults to files-only; `run:true`
-  executes only with the principal's approval.
+  `fingerprint`, `doctor`, and `history` as agent tools with structured
+  JSON results. Zero new dependencies. `reproduce` defaults to files-only;
+  `run:true` executes only with the principal's approval.
+- Failure history (`actionrepro history`, MCP `history` tool): append-only
+  JSONL log (`~/.actionrepro/history.jsonl` by default) keyed by
+  fingerprint. Answers same-as-before, occurrence counts, first/last seen,
+  fixes, and what changed between occurrences. Record from a log file or
+  an existing bundle; noisy-log tolerant (timestamps/versions ignored).
 
 ### Fixed
 
