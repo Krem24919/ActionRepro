@@ -50,6 +50,7 @@ cat actionrepro/failure.txt
 - [Usage](#usage)
 - [What the bundle contains](#what-the-bundle-contains)
 - [Verifying a fix (`verify`)](#verifying-a-fix-verify)
+- [Coding agents (MCP)](#coding-agents-mcp)
 - [Security: secret redaction](#security-secret-redaction)
 - [GitHub Action (optional, for other repos)](#github-action-optional-for-other-repos)
 - [How failure extraction works (no LLM)](#how-failure-extraction-works-no-llm)
@@ -212,6 +213,35 @@ machine-readable form. The comparison is a stable hash over ecosystem,
 command, exit code, and normalized error lines — no probabilities, just
 match / differ / unreadable.
 
+## Coding agents (MCP)
+
+`actionrepro mcp` speaks the Model Context Protocol over stdio (spec
+2025-11-25; older versions negotiated), exposing five tools with structured
+JSON results: `inspect`, `reproduce`, `verify`, `fingerprint`, `doctor`.
+Same functions as the CLI — agents and humans can never disagree about what
+a failure means.
+
+Claude Code (project `.mcp.json`, or `claude mcp add actionrepro -- node
+/path/to/ActionRepro/dist/cli.js mcp`):
+
+```json
+{
+  "mcpServers": {
+    "actionrepro": {
+      "command": "node",
+      "args": ["/path/to/ActionRepro/dist/cli.js", "mcp"]
+    }
+  }
+}
+```
+
+Suggested agent loop: `inspect` the failure → `reproduce` it into a bundle
+→ edit code → re-run the bundle command → `verify` the fresh log.
+`reproduce` defaults to files-only; pass `run: true` only with the user's
+explicit approval (MCP sessions are non-interactive, so the terminal
+confirmation gate is skipped there). Tokens go only to `api.github.com`
+and are never echoed; all outputs are secret-redacted best-effort.
+
 ## Security: secret redaction
 
 Every log line, summary, file, and error message passes through deterministic, pattern-based redaction before it is printed or written. It is best-effort, not a guarantee — always review a bundle before sharing:
@@ -283,9 +313,10 @@ Same input → same output. Fixtures live in [`fixtures/logs/`](fixtures/logs/).
 
 ```
 src/
-  cli.ts                 # commander wiring (default/inspect/reproduce/doctor/verify)
+  cli.ts                 # commander wiring (default/inspect/reproduce/doctor/verify/mcp)
   index.ts               # public library exports
   commands/              # inspect.ts reproduce.ts doctor.ts verify.ts
+  mcp/                   # protocol.ts tools.ts server.ts (MCP stdio server, zero deps)
   core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts fingerprint.ts workflow.ts
   providers/             # types.ts (CiProvider) + github-actions.ts
   ecosystems/            # adapters.ts + registry.ts + types.ts (per-ecosystem behavior)

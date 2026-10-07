@@ -4,6 +4,7 @@ import { inspectTarget, formatInspectHuman } from "./commands/inspect.js";
 import { reproduceTarget } from "./commands/reproduce.js";
 import { verifyBundle, formatVerifyHuman } from "./commands/verify.js";
 import { doctor, formatDoctorHuman } from "./commands/doctor.js";
+import { runMcpStdio } from "./mcp/server.js";
 import { VERSION } from "./utils/version.js";
 import { redactText } from "./core/redact.js";
 import { sanitizeActionsOutput } from "./utils/log.js";
@@ -105,12 +106,19 @@ program
     }
   });
 
+program
+  .command("mcp")
+  .description("Run as an MCP server over stdio (for coding agents).")
+  .action(async () => {
+    await runMcpStdio();
+  });
+
 // Default shorthand: `actionrepro <url|file> [--out dir] [--run] [--token T] [--json]`
 // Handled manually (not via commander program-action) because a program-level
 // action+options breaks subcommand option parsing in commander.
 // IMPORTANT: every `program.command(...)` name below MUST also appear in
 // KNOWN_SUBCOMMANDS, or the shorthand dispatcher will swallow it as a target.
-const KNOWN_SUBCOMMANDS = ["inspect", "reproduce", "doctor", "verify"];
+const KNOWN_SUBCOMMANDS = ["inspect", "reproduce", "doctor", "verify", "mcp"];
 async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
   const first = argv[0];
   if (!first) return false;

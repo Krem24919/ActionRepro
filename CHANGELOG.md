@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- MCP server (`actionrepro mcp`): stdio JSON-RPC interface (MCP 2025-11-25,
+  older versions negotiated) exposing `inspect`, `reproduce`, `verify`,
+  `fingerprint`, and `doctor` as agent tools with structured JSON results.
+  Zero new dependencies. `reproduce` defaults to files-only; `run:true`
+  executes only with the principal's approval.
+
 ### Fixed
 
 - The reusable action (`action.yml`) is self-contained: it builds itself

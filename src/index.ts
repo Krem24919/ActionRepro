@@ -26,3 +26,9 @@ export {
 } from "./core/fingerprint.js";
 export type { VerifyVerdict } from "./core/fingerprint.js";
 export { extractStepScript, commandsAgree } from "./core/workflow.js";
+export { McpServer, runMcpStdio } from "./mcp/server.js";
+export { MCP_TOOLS } from "./mcp/tools.js";
+export {
+  SUPPORTED_PROTOCOL_VERSIONS,
+  PREFERRED_PROTOCOL_VERSION,
+} from "./mcp/protocol.js";
