@@ -79,6 +79,10 @@ actionrepro --help
 > Distribution is source-only by design — there is no registry package
 > and none is planned. Clone, build, and optionally `npm install -g .`
 > to put `actionrepro` on your PATH.
+>
+> **Versioning:** tags `v0.1.0`–`v0.2.0` were early builds, now published as
+> Alpha prereleases (`v0.1.0-alpha.1` … `v0.1.0-alpha.3`). Numbering restarts
+> at 0.1.0 for the production-grade rebuild.
 
 Termux (from source):
 
@@ -220,7 +224,7 @@ Verdicts in practice:
 - `NOT_REPRODUCED` — either a different failure, **or no failure at all**
   (the command exited 0: that is what "my fix worked" looks like).
 - `INCONCLUSIVE` — the fresh log is missing/empty/unreadable, or the bundle
-  was created before 0.3.0 (older fingerprints hashed a context window and
+  was created before 0.1.0 (older fingerprints hashed a context window and
   cannot be compared with the current algorithm — re-create the bundle).
 
 Lines that the bundle's own script prints start with `==> [actionrepro]` and
@@ -298,7 +302,7 @@ jobs:
         with:
           node-version: 20
       - name: Build repro bundle (redacted)
-        uses: Krem24919/ActionRepro@v0.2.0
+        uses: Krem24919/ActionRepro@main # temporary: pinned to a release tag once 0.1.0 ships
         with:
           run-url: ${{ github.event.workflow_run.html_url }}
           out: actionrepro

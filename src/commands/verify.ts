@@ -96,7 +96,7 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
       "Bundle has no recorded fingerprint (created by an older version?). Re-create the bundle to verify.",
     );
   }
-  // Fingerprint algorithm changed in 0.3.0 (context window -> failure anchor).
+  // Fingerprint algorithm changed in 0.1.0 (context window -> failure anchor).
   // Comparing across algorithms would produce a meaningless NOT_REPRODUCED.
   const version = meta.fingerprintVersion ?? "";
   if (version !== FINGERPRINT_ALGO) {
@@ -104,7 +104,7 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
       input,
       meta,
       recorded,
-      `Bundle fingerprint uses "${version || "sha256-v1 (pre-0.3.0)"}", this actionrepro computes "${FINGERPRINT_ALGO}". ` +
+      `Bundle fingerprint uses "${version || "sha256-v1 (pre-0.1.0)"}", this actionrepro computes "${FINGERPRINT_ALGO}". ` +
         `Re-create the bundle (actionrepro reproduce <target> --out ${input.bundleDir}) to verify against it.`,
     );
   }

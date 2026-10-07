@@ -1,6 +1,6 @@
 {
   "name": "actionrepro",
-  "version": "0.3.0",
+  "version": "0.1.0",
   "description": "Turn a failed GitHub Actions run into a local reproducibility bundle. No LLM, no backend, no telemetry.",
   "license": "MIT",
   "author": "ActionRepro contributors",

@@ -2,7 +2,25 @@
 
 All notable changes to this project will be documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.3.0] - 2026-10-07
+## [0.1.0] - unreleased
+
+> **Versioning restart.** Tags `v0.1.0`–`v0.2.0` were early builds and are now
+> published as Alpha prereleases (`v0.1.0-alpha.1` … `v0.1.0-alpha.3`).
+> Numbering restarts at 0.1.0 for the production-grade rebuild. Everything
+> below ships in 0.1.0; older numbering survives under Alpha history.
+
+### Added
+
+- MCP server (`actionrepro mcp`): stdio JSON-RPC interface (MCP 2025-11-25,
+  older versions negotiated) exposing `inspect`, `reproduce`, `verify`,
+  `fingerprint`, `doctor`, and `history` as agent tools with structured
+  JSON results. Zero new dependencies. `reproduce` defaults to files-only;
+  `run:true` executes only with the principal's approval.
+- Failure history (`actionrepro history`, MCP `history` tool): append-only
+  JSONL log (`~/.actionrepro/history.jsonl` by default) keyed by
+  fingerprint. Answers same-as-before, occurrence counts, first/last seen,
+  fixes, and what changed between occurrences. Record from a log file or
+  an existing bundle; noisy-log tolerant (timestamps/versions ignored).
 
 ### Fixed
 
@@ -29,10 +47,18 @@ All notable changes to this project will be documented in this file. Format foll
 - `npm test` no longer fails on a machine without outbound network: the
   `doctor` integration test tolerates an unreachable `api.github.com` while
   still requiring the toolchain checks to pass.
+- The reusable action (`action.yml`) is self-contained: it builds itself
+  from the pinned tag's source, so
+  `uses: Krem24919/ActionRepro@main` just works (pinned to a release tag
+  once 0.1.0 ships). New `log-file` input
+  as an alternative to `run-url` for saved logs.
+- Our own CI now dogfoods the composite action on every push
+  (`.github/workflows/dogfood.yml`): build from source, bundle a fixture
+  log, assert outputs and bundle files.
 
 ### Changed
 
-- Failure history (Phase 2) records the fingerprint algorithm per entry
+- Failure history records the fingerprint algorithm per entry
   (`fpv`). A fingerprint only compares within one algorithm, so `history stats`
   counts entries written by an older generation and `history --lookup X` says
   so explicitly when a fingerprint was never recorded, instead of implying
@@ -41,7 +67,7 @@ All notable changes to this project will be documented in this file. Format foll
 - Failure fingerprints are now `sha256-v2`: the hash covers ecosystem, command,
   exit code, error kind, and the failure **anchor line** instead of a context
   window, so the same failure hashes the same in CI and locally. `repro.json`
-  records `fingerprintVersion`; verifying a bundle created before 0.3.0 is
+  records `fingerprintVersion`; verifying a bundle created before 0.1.0 is
   `INCONCLUSIVE` with a "re-create the bundle" message rather than a wrong
   verdict.
 - All status lines printed by generated scripts are prefixed with
@@ -50,35 +76,12 @@ All notable changes to this project will be documented in this file. Format foll
 - The failure anchor, its pattern label (`errorKind`), and `matched` are part of
   the extracted failure, the library exports, and the MCP `fingerprint` tool.
 
-## [Unreleased]
-
-### Added
-
-- MCP server (`actionrepro mcp`): stdio JSON-RPC interface (MCP 2025-11-25,
-  older versions negotiated) exposing `inspect`, `reproduce`, `verify`,
-  `fingerprint`, `doctor`, and `history` as agent tools with structured
-  JSON results. Zero new dependencies. `reproduce` defaults to files-only;
-  `run:true` executes only with the principal's approval.
-- Failure history (`actionrepro history`, MCP `history` tool): append-only
-  JSONL log (`~/.actionrepro/history.jsonl` by default) keyed by
-  fingerprint. Answers same-as-before, occurrence counts, first/last seen,
-  fixes, and what changed between occurrences. Record from a log file or
-  an existing bundle; noisy-log tolerant (timestamps/versions ignored).
-
-### Fixed
-
-- The reusable action (`action.yml`) is self-contained: it builds itself
-  from the pinned tag's source, so
-  `uses: Krem24919/ActionRepro@v0.2.0` just works. New `log-file` input
-  as an alternative to `run-url` for saved logs.
-- Our own CI now dogfoods the composite action on every push
-  (`.github/workflows/dogfood.yml`): build from source, bundle a fixture
-  log, assert outputs and bundle files.
-
 ### Removed
 
 - Registry publishing step from the release workflow. Distribution is
   source-only by design (git tags + GitHub Releases + reusable action).
+
+## Alpha history (superseded numbering — releases marked prerelease)
 
 ## [0.2.0] - 2026-10-06
 

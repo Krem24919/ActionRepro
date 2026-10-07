@@ -25,7 +25,7 @@ export interface HistoryEntry {
   fingerprint: string;
   /**
    * Fingerprint algorithm that produced `fingerprint` (absent on entries
-   * written before 0.3.0, i.e. sha256-v1). Fingerprints are only comparable
+   * written before 0.1.0, i.e. sha256-v1). Fingerprints are only comparable
    * within one algorithm, so mismatched entries are counted and reported
    * instead of silently never matching again.
    */
