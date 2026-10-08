@@ -421,6 +421,14 @@ caches, artifacts, secrets, or matrix variables. Use `verify` as evidence
 Use `reproduce.ps1`. The generated scripts ask for confirmation on
 interactive terminals; set `CI_REPRO_YES=1` to skip it in automation.
 
+**How is this different from `act`?**
+`act` re-executes whole workflows in Docker _before_ anything fails (great
+for testing workflow files; needs Docker). ActionRepro starts _after_ a
+failure: from a run URL it extracts the exact failed step, builds a
+shareable redacted bundle, and verifies the fix with fingerprints. They
+complement each other — every bundle with a known job even prints the exact
+`act -j "<job>"` fallback for environment-shaped failures.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

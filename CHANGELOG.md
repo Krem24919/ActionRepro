@@ -38,6 +38,9 @@ All notable changes to this project will be documented in this file. Format foll
   (assertion diffs, Maven/Gradle summaries, .NET/xUnit diagnostics, RSpec
   failures, `file:line` with `:line N` and `# ` forms) plus `java`/`.NET`/
   `ruby` runtime detection and `doctor` toolchain probes.
+- act interoperability: bundles with a known failing job print the exact
+  `act -j "<job>"` fallback (whole-job Docker replay vs exact-step bundle),
+  and the README documents the boundary.
 
 ### Fixed
 

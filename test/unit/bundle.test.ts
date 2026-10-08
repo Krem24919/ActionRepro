@@ -91,4 +91,31 @@ describe("createBundle", () => {
     expect(sh).toMatch(/npm test/);
     fs.rmSync(out, { recursive: true, force: true });
   });
+
+  it("points at act with the exact job when known, stays silent otherwise", () => {
+    const raw = fx("npm-fail.log");
+    const red = redactText(raw);
+    const lines = red.text.split("\n");
+    const base = {
+      sourceDisplay: "npm",
+      ecosystem: detectEcosystem(lines),
+      runtime: detectRuntime(lines),
+      failure: extractFailure(lines),
+      redactedLogs: red.text,
+      redactions: red.redactions,
+      fingerprint: "test-fingerprint",
+    };
+    const withJob = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-act-"));
+    createBundle({ ...base, runMeta: { job: "test (20.x)" } }, withJob);
+    const readme = fs.readFileSync(path.join(withJob, "README.md"), "utf8");
+    expect(readme).toContain('act -j "test (20.x)"');
+    expect(readme).toContain("nektos/act");
+    const noJob = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-noact-"));
+    createBundle(base, noJob);
+    expect(fs.readFileSync(path.join(noJob, "README.md"), "utf8")).not.toContain(
+      "act -j",
+    );
+    fs.rmSync(withJob, { recursive: true, force: true });
+    fs.rmSync(noJob, { recursive: true, force: true });
+  });
 });

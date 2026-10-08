@@ -375,7 +375,19 @@ log file and verify it:
 CI_REPRO_YES=1 ./reproduce.sh > ./local-run.log 2>&1
 actionrepro verify . ./local-run.log
 \`\`\`
+${
+  meta?.job
+    ? `
+This bundle replays the failing *step*. To re-run the whole *job* in Docker
+instead (services, caches, runner image), use
+[act](https://github.com/nektos/act) with this job:
 
+\`\`\`bash
+act -j "${meta.job.replace(/"/g, "'")}"
+\`\`\`
+`
+    : ""
+}
 ## What this does NOT do
 
 - Does not check out your repository or any specific commit.
