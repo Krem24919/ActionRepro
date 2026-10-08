@@ -35,10 +35,6 @@ const INSTRUCTIONS =
 
 export class McpServer {
   private queue: Promise<void> = Promise.resolve();
-  // Tracks whether the client completed the handshake. Recorded for
-  // observability only: requests are answered even before `initialize`
-  // (lenient by design, so hand-rolled clients and tests stay simple).
-  private initialized = false;
 
   constructor(private readonly tools: McpToolDef[] = MCP_TOOLS) {}
 
@@ -59,7 +55,7 @@ export class McpServer {
     }
     if (msg.kind === "notification") {
       // notifications/initialized and anything else: acknowledge silently.
-      if (msg.method === "notifications/initialized") this.initialized = true;
+      // Requests are answered even before `initialize` (lenient by design).
       return null;
     }
     switch (msg.method) {

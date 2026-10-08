@@ -5,7 +5,9 @@
     "noEmit": true,
     "rootDir": ".",
     "outDir": "dist-test-check",
-    "types": ["node"]
+    "types": ["node"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "exclude": ["node_modules", "dist"]
 }

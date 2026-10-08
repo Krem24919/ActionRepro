@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import { ensureDir } from "../utils/fs.js";
 import { redactText } from "./redact.js";
 import { hashBundleFiles, FINGERPRINT_ALGO } from "./fingerprint.js";
@@ -547,6 +546,5 @@ export function createBundle(input: BundleInput, outDir: string): BundleResult {
     `# actionrepro bundle integrity: sha256 over reproduce.sh, reproduce.ps1,\n# failure.txt and environment.txt (sorted by name, in that framing).\n${bundleSha256}\nreproduce.sh\nreproduce.ps1\nfailure.txt\nenvironment.txt\n`,
   );
 
-  void path;
   return { outDir, files };
 }
