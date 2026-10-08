@@ -55,3 +55,35 @@ export const goAdapter: EcosystemAdapter = {
   runHint: "Go toolchain.",
   manifests: ["go.mod"],
 };
+
+export const mavenAdapter: EcosystemAdapter = {
+  id: "maven",
+  installCommand: "mvn -B dependency:resolve",
+  testCommand: "mvn -B test",
+  runHint: "Java with Apache Maven.",
+  manifests: ["pom.xml"],
+};
+
+export const gradleAdapter: EcosystemAdapter = {
+  id: "gradle",
+  installCommand: "./gradlew -q dependencies",
+  testCommand: "./gradlew test",
+  runHint: "Java with Gradle (wrapper preferred).",
+  manifests: ["build.gradle", "build.gradle.kts", "gradlew"],
+};
+
+export const dotnetAdapter: EcosystemAdapter = {
+  id: "dotnet",
+  installCommand: "dotnet restore",
+  testCommand: "dotnet test",
+  runHint: ".NET SDK.",
+  manifests: ["*.sln", "*.csproj", "global.json"],
+};
+
+export const rubyAdapter: EcosystemAdapter = {
+  id: "ruby",
+  installCommand: "bundle install",
+  testCommand: "bundle exec rspec",
+  runHint: "Ruby with Bundler.",
+  manifests: ["Gemfile", "Gemfile.lock", "Rakefile"],
+};

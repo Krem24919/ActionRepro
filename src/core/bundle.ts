@@ -118,6 +118,25 @@ function installBlock(eco: EcosystemInfo): string {
         'if ! command -v go >/dev/null 2>&1; then echo "TOOL_MISSING: go not found. Install Go (Termux: pkg install golang)"; exit 2; fi',
         'go mod download || echo "WARNING: go mod download failed (continuing anyway)"',
       ].join("\n");
+    case "maven":
+      return [
+        'if ! command -v mvn >/dev/null 2>&1; then echo "TOOL_MISSING: mvn not found. Install Maven (Termux: pkg install maven)"; exit 2; fi',
+        "mvn -B dependency:resolve",
+      ].join("\n");
+    case "gradle":
+      return [
+        "if [ -f gradlew ]; then ./gradlew -q dependencies; else gradle -q dependencies; fi",
+      ].join("\n");
+    case "dotnet":
+      return [
+        'if ! command -v dotnet >/dev/null 2>&1; then echo "TOOL_MISSING: dotnet not found. Install the .NET SDK"; exit 2; fi',
+        "dotnet restore",
+      ].join("\n");
+    case "ruby":
+      return [
+        'if ! command -v bundle >/dev/null 2>&1; then echo "TOOL_MISSING: bundle not found. Install Ruby + Bundler (Termux: pkg install ruby)"; exit 2; fi',
+        "bundle install",
+      ].join("\n");
     default:
       return 'echo "(unknown ecosystem) install your dependencies manually, then re-run the failing command below."';
   }
@@ -288,6 +307,14 @@ function psInstall(eco: EcosystemInfo): string {
       return `cargo fetch`;
     case "go":
       return `go mod download`;
+    case "maven":
+      return `mvn -B dependency:resolve`;
+    case "gradle":
+      return `if (Test-Path gradlew.bat) { .\\gradlew.bat -q dependencies } else { gradle -q dependencies }`;
+    case "dotnet":
+      return `dotnet restore`;
+    case "ruby":
+      return `bundle install`;
     default:
       return `Write-Host "(unknown ecosystem) install dependencies manually."`;
   }

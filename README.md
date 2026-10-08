@@ -16,7 +16,7 @@ actionrepro https://github.com/OWNER/REPO/actions/runs/RUN_ID
 actionrepro ./failure.log
 ```
 
-It fetches the workflow run + jobs + logs via the official GitHub API, detects the ecosystem (`npm` / `pnpm` / `yarn` / `pip` / `uv` / `cargo` / `go`), extracts the most likely failure cause and the closest repro command, redacts secrets heuristically, and writes a ready-to-run `actionrepro/` folder.
+It fetches the workflow run + jobs + logs via the official GitHub API, detects the ecosystem (`npm` / `pnpm` / `yarn` / `pip` / `uv` / `cargo` / `go` / `maven` / `gradle` / `dotnet` / `ruby`), extracts the most likely failure cause and the closest repro command, redacts secrets heuristically, and writes a ready-to-run `actionrepro/` folder.
 
 ## Before / after
 
@@ -199,6 +199,10 @@ The script is ecosystem-aware:
 - `uv` → `uv sync` then `uv run pytest`
 - `cargo` → `cargo fetch` then `cargo test`
 - `go` → `go mod download` then `` `go test ./...` ``
+- `maven` → `mvn -B dependency:resolve` then `mvn -B test`
+- `gradle` → `./gradlew -q dependencies` then `./gradlew test`
+- `dotnet` → `dotnet restore` then `dotnet test`
+- `ruby` → `bundle install` then `bundle exec rspec`
 
 Scope: the bundle replays dependency install + the closest failing command with your user privileges. It does not check out any commit, and does not provide CI services, caches, artifacts, secrets, or matrix variables — a pass/fail here is best-effort evidence, not proof.`
 

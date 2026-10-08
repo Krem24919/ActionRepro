@@ -65,6 +65,10 @@ export async function doctor(): Promise<DoctorResult> {
     ["uv", ["--version"]],
     ["cargo", ["--version"]],
     ["go", ["version"]],
+    ["mvn", ["--version"]],
+    ["gradle", ["--version"]],
+    ["dotnet", ["--version"]],
+    ["ruby", ["--version"]],
     ["bash", ["--version"]],
   ];
   for (const [cmd, args] of tools) {
@@ -74,13 +78,41 @@ export async function doctor(): Promise<DoctorResult> {
       ok: cmd === "git" || cmd === "node" || cmd === "bash" ? v !== null : true,
       detail:
         v ??
-        (["pnpm", "yarn", "uv", "cargo", "go", "python3", "pip", "npm"].includes(cmd)
+        ([
+          "pnpm",
+          "yarn",
+          "uv",
+          "cargo",
+          "go",
+          "python3",
+          "pip",
+          "npm",
+          "mvn",
+          "gradle",
+          "dotnet",
+          "ruby",
+        ].includes(cmd)
           ? "not installed (optional — needed only for matching projects)"
           : "not found"),
     });
     // Optional tools should not fail doctor; mark ok=true with note.
     const last = checks[checks.length - 1];
-    if (["pnpm", "yarn", "python3", "pip", "uv", "cargo", "go", "npm"].includes(cmd)) {
+    if (
+      [
+        "pnpm",
+        "yarn",
+        "python3",
+        "pip",
+        "uv",
+        "cargo",
+        "go",
+        "npm",
+        "mvn",
+        "gradle",
+        "dotnet",
+        "ruby",
+      ].includes(cmd)
+    ) {
       last.ok = true;
     }
   }

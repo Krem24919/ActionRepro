@@ -1,0 +1,20 @@
+2024-05-02T10:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-02T10:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-02T10:00:02.0000000Z ##[group]Run actions/checkout@v4
+2024-05-02T10:00:03.0000000Z ##[endgroup]
+2024-05-02T10:00:04.0000000Z ##[group]Run actions/setup-java@v4
+2024-05-02T10:00:05.0000000Z openjdk version "17.0.10" 2024-01-16
+2024-05-02T10:00:06.0000000Z ##[endgroup]
+2024-05-02T10:00:07.0000000Z ##[group]Run ./gradlew test
+2024-05-02T10:00:08.0000000Z Welcome to Gradle 8.7!
+2024-05-02T10:00:15.0000000Z > Task :compileJava
+2024-05-02T10:00:16.0000000Z > Task :compileTestJava
+2024-05-02T10:00:20.0000000Z > Task :test FAILED
+2024-05-02T10:00:20.0000000Z com.example.AddTest > testAdds FAILED
+2024-05-02T10:00:20.0000000Z     expected:<4> but was:<3>
+2024-05-02T10:00:20.0000000Z         at com.example.AddTest.testAdds(AddTest.java:14)
+2024-05-02T10:00:21.0000000Z 1 test completed, 1 failed
+2024-05-02T10:00:21.0000000Z FAILURE: Build failed with an exception.
+2024-05-02T10:00:21.0000000Z * What went wrong:
+2024-05-02T10:00:21.0000000Z Execution failed for task ':test'.
+2024-05-02T10:00:21.0000000Z ##[error]Process completed with exit code 1.

@@ -23,4 +23,10 @@ describe("detectRuntime", () => {
     const rs = fx("cargo-fail.log");
     expect(detectRuntime(rs).rust).toBe("1.78.0");
   });
+  it("detects java + dotnet + ruby", () => {
+    expect(detectRuntime(fx("maven-fail.log")).java).toBe("17.0.10");
+    expect(detectRuntime(fx("gradle-fail.log")).java).toBe("17.0.10");
+    expect(detectRuntime(fx("dotnet-fail.log")).dotnet).toBe("8.0.100");
+    expect(detectRuntime(fx("ruby-fail.log")).ruby).toBe("3.2.2");
+  });
 });

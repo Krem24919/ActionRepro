@@ -7,6 +7,9 @@ export interface RuntimeInfo {
   python?: string;
   go?: string;
   rust?: string;
+  java?: string;
+  dotnet?: string;
+  ruby?: string;
   packageManager?: string;
   runnerName?: string;
 }
@@ -42,6 +45,15 @@ export function detectRuntime(logLines: string[]): RuntimeInfo {
   const rust = joined.match(/rustc (\d+\.\d+\.\d+)/i);
   if (rust) info.rust = rust[1];
 
+  const java = joined.match(/(?:openjdk|java) version "([^"]+)"/i);
+  if (java) info.java = java[1];
+
+  const dotnet = joined.match(/\.NET SDK[\s\S]{0,300}?Version:\s*([0-9][^\s]*)/i);
+  if (dotnet) info.dotnet = dotnet[1];
+
+  const ruby = joined.match(/\bruby (\d+\.\d+\.\d+)/i);
+  if (ruby) info.ruby = ruby[1];
+
   const pm =
     joined.match(/\bnpm[@\s]v?(\d+\.\d+\.\d+)/i) ??
     joined.match(/\bpnpm (\d+\.\d+\.\d+)/i) ??
@@ -62,6 +74,9 @@ export function formatEnvironment(info: RuntimeInfo): string {
     ["Python", info.python ?? "not detected"],
     ["Go", info.go ?? "not detected"],
     ["Rust", info.rust ?? "not detected"],
+    ["Java", info.java ?? "not detected"],
+    [".NET", info.dotnet ?? "not detected"],
+    ["Ruby", info.ruby ?? "not detected"],
     ["Package manager", info.packageManager ?? "not detected"],
     ["Runner", info.runnerName ?? "GitHub-hosted runner"],
   ];

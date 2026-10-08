@@ -32,6 +32,12 @@ All notable changes to this project will be documented in this file. Format foll
   registry (`findProvider`, `resolveProviderToken`). Token: `--token` flag
   or `GITLAB_TOKEN` env, never printed. Statuses map to the shared
   vocabulary; per-step data and the workflow cross-check stay GitHub-only.
+- New ecosystems with real detection, repro scripts, and fixtures:
+  `maven` (`mvn -B test`), `gradle` (`./gradlew test`), `dotnet`
+  (`dotnet test`), `ruby` (`bundle exec rspec`). New extract patterns
+  (assertion diffs, Maven/Gradle summaries, .NET/xUnit diagnostics, RSpec
+  failures, `file:line` with `:line N` and `# ` forms) plus `java`/`.NET`/
+  `ruby` runtime detection and `doctor` toolchain probes.
 
 ### Fixed
 

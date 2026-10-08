@@ -1,0 +1,19 @@
+2024-05-03T10:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-03T10:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-03T10:00:02.0000000Z ##[group]Run actions/checkout@v4
+2024-05-03T10:00:03.0000000Z ##[endgroup]
+2024-05-03T10:00:04.0000000Z ##[group]Run actions/setup-dotnet@v4
+2024-05-03T10:00:05.0000000Z .NET SDK:
+2024-05-03T10:00:05.0000000Z  Version:           8.0.100
+2024-05-03T10:00:06.0000000Z ##[endgroup]
+2024-05-03T10:00:07.0000000Z ##[group]Run dotnet test
+2024-05-03T10:00:10.0000000Z   Determining projects to restore...
+2024-05-03T10:00:15.0000000Z   Failed TestService.AddTests.AddsNumbers [12 ms]
+2024-05-03T10:00:15.0000000Z   Error Message:
+2024-05-03T10:00:15.0000000Z    Assert.Equal() Failure: Values differ
+2024-05-03T10:00:15.0000000Z   Expected: 4
+2024-05-03T10:00:15.0000000Z   Actual:   3
+2024-05-03T10:00:15.0000000Z   Stack Trace:
+2024-05-03T10:00:15.0000000Z      at TestService.AddTests.AddsNumbers() in /home/runner/work/demo/tests/AddTests.cs:line 12
+2024-05-03T10:00:16.0000000Z Failed!  - Failed:     1, Passed:     2, Skipped:     0, Total:     3, Duration: 45 ms
+2024-05-03T10:00:16.0000000Z ##[error]Process completed with exit code 1.

@@ -1,0 +1,22 @@
+2024-05-04T10:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-04T10:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-04T10:00:02.0000000Z ##[group]Run actions/checkout@v4
+2024-05-04T10:00:03.0000000Z ##[endgroup]
+2024-05-04T10:00:04.0000000Z ##[group]Run actions/setup-ruby@v1
+2024-05-04T10:00:05.0000000Z ruby 3.2.2 (2023-03-30 revision e51014f9c0) [x86_64-linux]
+2024-05-04T10:00:06.0000000Z ##[endgroup]
+2024-05-04T10:00:07.0000000Z ##[group]Run bundle exec rspec
+2024-05-04T10:00:10.0000000Z Failures:
+2024-05-04T10:00:10.0000000Z
+2024-05-04T10:00:10.0000000Z   1) Calculator adds numbers
+2024-05-04T10:00:10.0000000Z      Failure/Error: expect(result).to eq(4)
+2024-05-04T10:00:10.0000000Z
+2024-05-04T10:00:10.0000000Z        expected: 4
+2024-05-04T10:00:10.0000000Z             got: 3
+2024-05-04T10:00:10.0000000Z
+2024-05-04T10:00:10.0000000Z        (compared using ==)
+2024-05-04T10:00:10.0000000Z      # ./spec/calculator_spec.rb:7:in `block (2 levels) in <main>'
+2024-05-04T10:00:11.0000000Z Finished in 0.05 seconds (files took 0.4 seconds to load)
+2024-05-04T10:00:11.0000000Z 3 examples, 1 failure
+2024-05-04T10:00:11.0000000Z rspec ./spec/calculator_spec.rb:7 # Calculator adds numbers
+2024-05-04T10:00:11.0000000Z ##[error]Process completed with exit code 1.

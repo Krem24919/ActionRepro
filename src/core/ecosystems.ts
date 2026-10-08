@@ -1,7 +1,18 @@
 import { normalizedLines } from "./logs.js";
 
 export type EcosystemId =
-  "npm" | "pnpm" | "yarn" | "pip" | "uv" | "cargo" | "go" | "unknown";
+  | "npm"
+  | "pnpm"
+  | "yarn"
+  | "pip"
+  | "uv"
+  | "cargo"
+  | "go"
+  | "maven"
+  | "gradle"
+  | "dotnet"
+  | "ruby"
+  | "unknown";
 
 export interface EcosystemInfo {
   id: EcosystemId;
@@ -57,6 +68,32 @@ const DEFINITIONS: Record<
     installCommand: "go mod download",
     testCommand: "go test ./...",
     runHint: "Go toolchain. Uses go.mod when present.",
+  },
+  maven: {
+    id: "maven",
+    installCommand: "mvn -B dependency:resolve",
+    testCommand: "mvn -B test",
+    runHint: "Java with Apache Maven. Uses pom.xml when present.",
+  },
+  gradle: {
+    id: "gradle",
+    installCommand:
+      "if [ -f gradlew ]; then ./gradlew -q dependencies; else gradle -q dependencies; fi",
+    testCommand: "./gradlew test",
+    runHint: "Java with Gradle. Uses the gradlew wrapper when present.",
+  },
+  dotnet: {
+    id: "dotnet",
+    installCommand: "dotnet restore",
+    testCommand: "dotnet test",
+    runHint: ".NET SDK. Uses the solution/project files when present.",
+  },
+  ruby: {
+    id: "ruby",
+    installCommand: "bundle install",
+    testCommand: "bundle exec rspec",
+    runHint:
+      "Ruby with Bundler (RSpec; use `bundle exec rake test` for Minitest projects).",
   },
 };
 
@@ -123,6 +160,35 @@ export function detectEcosystem(
   if (has(/\bgo\s+test\b/) || has(/\bgo\s+build\b/) || has(/go\.mod/)) {
     pushEvidence(scores, "go", 10, "log mentions go command");
   }
+  if (
+    has(/^\s*Run\s+mvn\b/m) ||
+    has(/\bmvn\s+(-B\b|test|verify|package|compile|dependency)\b/) ||
+    has(/pom\.xml/)
+  ) {
+    pushEvidence(scores, "maven", 10, "log mentions Maven command");
+  }
+  if (
+    has(/^\s*Run\s+(\.\/)?gradlew?\b/m) ||
+    has(/\bgradle(w)?\s+(test|build|check)\b/) ||
+    has(/build\.gradle(\.kts)?/)
+  ) {
+    pushEvidence(scores, "gradle", 10, "log mentions Gradle command");
+  }
+  if (
+    has(/^\s*Run\s+dotnet\b/m) ||
+    has(/\bdotnet\s+(test|build|run|restore|publish)\b/) ||
+    has(/\.csproj\b/) ||
+    has(/\.sln\b/)
+  ) {
+    pushEvidence(scores, "dotnet", 10, "log mentions dotnet command");
+  }
+  if (
+    has(/^\s*Run\s+(bundle\s+exec\s+)?(rspec|rake)\b/m) ||
+    has(/\bbundle\s+exec\b/) ||
+    has(/\bGemfile\b/)
+  ) {
+    pushEvidence(scores, "ruby", 10, "log mentions Ruby test command");
+  }
 
   // --- Error signatures ---
   if (has(/npm ERR!/)) pushEvidence(scores, "npm", 6, "log contains npm ERR!");
@@ -146,6 +212,29 @@ export function detectEcosystem(
   if (has(/FAIL\s+\S+\s+\[build failed\]|FAIL\s+\S+ .*\.go|panic: /)) {
     pushEvidence(scores, "go", 5, "log contains Go failure");
   }
+  if (
+    has(/Tests run:\s*\d+,\s*(Failures|Errors):\s*[1-9]/) ||
+    has(/BUILD FAILURE/) ||
+    has(/maven-surefire-plugin/)
+  ) {
+    pushEvidence(scores, "maven", 6, "log contains Maven failure markers");
+  }
+  if (has(/FAILURE: Build failed/) || has(/> Task .* FAILED/)) {
+    pushEvidence(scores, "gradle", 6, "log contains Gradle failure markers");
+  }
+  if (has(/error (CS|MSB)\d+/) || has(/Failed:\s*\d+,\s*Passed:/)) {
+    pushEvidence(scores, "dotnet", 6, "log contains .NET failure markers");
+  }
+  if (
+    has(/Failure\/Error: /) ||
+    has(/^Failures:$/m) ||
+    (has(/^(Failure|Error):$/m) && has(/\.rb:\d+/))
+  ) {
+    pushEvidence(scores, "ruby", 6, "log contains Ruby test failure");
+  }
+  if (has(/\.rb:\d+/)) {
+    pushEvidence(scores, "ruby", 4, "log contains Ruby backtrace");
+  }
   // Node test runners are npm-family; only count if no stronger signal yet
   if (has(/\b(vitest|jest|mocha)\b.*(fail|FAIL|Error)/)) {
     pushEvidence(scores, "npm", 2, "log mentions JS test runner failure");
@@ -165,6 +254,13 @@ export function detectEcosystem(
   }
   if (hasFile("cargo.toml")) pushEvidence(scores, "cargo", 4, "project has Cargo.toml");
   if (hasFile("go.mod")) pushEvidence(scores, "go", 4, "project has go.mod");
+  if (hasFile("pom.xml")) pushEvidence(scores, "maven", 4, "project has pom.xml");
+  if (hasFile("build.gradle", "build.gradle.kts", "gradlew")) {
+    pushEvidence(scores, "gradle", 4, "project has Gradle build file");
+  }
+  if (hasFile("gemfile", "gemfile.lock", "rakefile")) {
+    pushEvidence(scores, "ruby", 4, "project has Ruby manifest");
+  }
 
   if (scores.size === 0) {
     return {
@@ -201,6 +297,14 @@ export function ecosystemInstallFallback(id: EcosystemId): string {
       return "cargo fetch";
     case "go":
       return "go mod download";
+    case "maven":
+      return "mvn -B dependency:resolve";
+    case "gradle":
+      return "./gradlew -q dependencies";
+    case "dotnet":
+      return "dotnet restore";
+    case "ruby":
+      return "bundle install";
     default:
       return "# install your project dependencies first";
   }

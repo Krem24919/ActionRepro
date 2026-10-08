@@ -29,6 +29,10 @@ describe("extractFailure", () => {
       ["cargo-fail.log", "rustc error", "error[E0308]: mismatched types"],
       ["go-fail.log", "test/compiler diagnostic", "add_test.go:10: got 3, want 4"],
       ["pnpm-fail.log", "pnpm error", "ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL"],
+      ["maven-fail.log", "assertion diff", "expected:<4> but was:<3>"],
+      ["gradle-fail.log", "assertion diff", "expected:<4> but was:<3>"],
+      ["dotnet-fail.log", "assertion failure", "Assert.Equal() Failure: Values differ"],
+      ["ruby-fail.log", "RSpec failure", "Failure/Error: expect(result).to eq(4)"],
     ];
     for (const [file, kind, needle] of cases) {
       const f = extractFailure(fixture(file));

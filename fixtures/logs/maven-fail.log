@@ -1,0 +1,16 @@
+2024-05-01T10:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-01T10:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-01T10:00:01.0000000Z Runner name: GitHub Actions 12
+2024-05-01T10:00:02.0000000Z ##[group]Run actions/checkout@v4
+2024-05-01T10:00:03.0000000Z ##[endgroup]
+2024-05-01T10:00:04.0000000Z ##[group]Run actions/setup-java@v4
+2024-05-01T10:00:05.0000000Z openjdk version "17.0.10" 2024-01-16
+2024-05-01T10:00:06.0000000Z ##[endgroup]
+2024-05-01T10:00:07.0000000Z ##[group]Run mvn -B test
+2024-05-01T10:00:08.0000000Z Apache Maven 3.9.6 (bc0240f3c744dd6b6ec2920b04f7597f3a639cb)
+2024-05-01T10:00:20.0000000Z [INFO] Running com.example.AddTest
+2024-05-01T10:00:21.0000000Z [ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0
+2024-05-01T10:00:21.0000000Z [ERROR]   AddTest.testAdds:14 expected:<4> but was:<3>
+2024-05-01T10:00:22.0000000Z [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.0.0:test (default-test) on project demo
+2024-05-01T10:00:22.0000000Z [ERROR] BUILD FAILURE
+2024-05-01T10:00:22.0000000Z ##[error]Process completed with exit code 1.

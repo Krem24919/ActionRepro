@@ -6,6 +6,10 @@ import {
   uvAdapter,
   cargoAdapter,
   goAdapter,
+  mavenAdapter,
+  gradleAdapter,
+  dotnetAdapter,
+  rubyAdapter,
 } from "./adapters.js";
 import type { EcosystemAdapter } from "./types.js";
 
@@ -18,6 +22,10 @@ export const ECOSYSTEM_REGISTRY: EcosystemAdapter[] = [
   uvAdapter,
   cargoAdapter,
   goAdapter,
+  mavenAdapter,
+  gradleAdapter,
+  dotnetAdapter,
+  rubyAdapter,
 ];
 
 export function getAdapter(id: EcosystemAdapter["id"]): EcosystemAdapter | undefined {

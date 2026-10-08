@@ -26,6 +26,31 @@ describe("detectEcosystem", () => {
   it("detects pnpm", () => {
     expect(detectEcosystem(lines("pnpm-fail.log")).id).toBe("pnpm");
   });
+  it("detects maven", () => {
+    const e = detectEcosystem(lines("maven-fail.log"));
+    expect(e.id).toBe("maven");
+    expect(e.confidence).toBe("high");
+  });
+  it("detects gradle", () => {
+    const e = detectEcosystem(lines("gradle-fail.log"));
+    expect(e.id).toBe("gradle");
+    expect(e.confidence).toBe("high");
+  });
+  it("detects dotnet", () => {
+    const e = detectEcosystem(lines("dotnet-fail.log"));
+    expect(e.id).toBe("dotnet");
+    expect(e.confidence).toBe("high");
+  });
+  it("detects ruby", () => {
+    const e = detectEcosystem(lines("ruby-fail.log"));
+    expect(e.id).toBe("ruby");
+    expect(e.confidence).toBe("high");
+  });
+  it("detects new ecosystems from project manifests alone", () => {
+    expect(detectEcosystem([], ["pom.xml"]).id).toBe("maven");
+    expect(detectEcosystem([], ["build.gradle.kts"]).id).toBe("gradle");
+    expect(detectEcosystem([], ["Gemfile", "README.md"]).id).toBe("ruby");
+  });
   it("is deterministic", () => {
     const a = detectEcosystem(lines("npm-fail.log"));
     const b = detectEcosystem(lines("npm-fail.log"));
