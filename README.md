@@ -384,6 +384,7 @@ npm run lint        # eslint, zero warnings
 npm run format      # prettier --check
 npm run build       # tsc -> dist/
 npm test            # vitest (unit + integration)
+npm run bench       # benchmark: accuracy, stability, verify matrix, timings
 npm run ci          # typecheck + lint + format + build + test
 node dist/cli.js doctor
 node dist/cli.js inspect fixtures/logs/npm-fail.log

@@ -1,0 +1,43 @@
+{
+  "$comment": "Ground truth for scripts/bench.sh. anchorContains must name the real diagnostic, never the runner exit marker.",
+  "fixtures": {
+    "npm-fail.log": {
+      "ecosystem": "npm",
+      "anchorContains": "AssertionError: expected 3 to equal 4"
+    },
+    "python-fail.log": {
+      "ecosystem": "pip",
+      "anchorContains": "AssertionError: assert 6 == 7"
+    },
+    "cargo-fail.log": {
+      "ecosystem": "cargo",
+      "anchorContains": "error[E0308]: mismatched types"
+    },
+    "go-fail.log": {
+      "ecosystem": "go",
+      "anchorContains": "add_test.go:10: got 3, want 4"
+    },
+    "pnpm-fail.log": {
+      "ecosystem": "pnpm",
+      "anchorContains": "ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL"
+    },
+    "maven-fail.log": {
+      "ecosystem": "maven",
+      "anchorContains": "expected:<4> but was:<3>"
+    },
+    "gradle-fail.log": {
+      "ecosystem": "gradle",
+      "anchorContains": "expected:<4> but was:<3>"
+    },
+    "dotnet-fail.log": {
+      "ecosystem": "dotnet",
+      "anchorContains": "Assert.Equal() Failure: Values differ"
+    },
+    "ruby-fail.log": {
+      "ecosystem": "ruby",
+      "anchorContains": "Failure/Error: expect(result).to eq(4)"
+    }
+  },
+  "summaryMustNotContain": ["Process completed with exit code"],
+  "cleanLog": "yarn-success.log"
+}

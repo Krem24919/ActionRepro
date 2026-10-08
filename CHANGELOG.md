@@ -41,6 +41,11 @@ All notable changes to this project will be documented in this file. Format foll
 - act interoperability: bundles with a known failing job print the exact
   `act -j "<job>"` fallback (whole-job Docker replay vs exact-step bundle),
   and the README documents the boundary.
+- Benchmark framework (`npm run bench`, `bench/expected.json`): measures
+  extraction accuracy, fingerprint stability under log noise, verification
+  correctness (same/different/clean logs), evidence reduction, and command
+  timings across all fixtures. Runs in CI (dogfood `bench` job); exit
+  nonzero on any regression.
 
 ### Fixed
 
