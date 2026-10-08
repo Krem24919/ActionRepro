@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseGitHubRunUrl } from "../core/url.js";
-import { GitHubActionsProvider } from "../providers/github-actions.js";
+import { findProvider, resolveProviderToken } from "../providers/registry.js";
 import { loadLogsFromFile } from "../core/logs.js";
 import { redactText } from "../core/redact.js";
 import { extractFailure } from "../core/extract.js";
@@ -9,12 +9,7 @@ import { detectEcosystem } from "../core/ecosystems.js";
 import { detectRuntime } from "../core/runtime.js";
 import { createBundle } from "../core/bundle.js";
 import { runReproduceScript } from "../core/runner.js";
-import {
-  allLogsFailed,
-  firstLogError,
-  resolveToken,
-  fetchWorkflowFile,
-} from "../core/github.js";
+import { allLogsFailed, firstLogError, fetchWorkflowFile } from "../core/github.js";
 import { fingerprintFailure } from "../core/fingerprint.js";
 import { extractStepScript, commandsAgree } from "../core/workflow.js";
 import type { BundleInput } from "../core/bundle.js";
@@ -51,7 +46,6 @@ function localProjectFiles(): string[] {
 
 export async function reproduceTarget(opts: ReproduceOptions): Promise<ReproduceResult> {
   const outDir = path.resolve(opts.outDir ?? "actionrepro");
-  const token = resolveToken(opts.token);
 
   if (fs.existsSync(opts.target) && fs.statSync(opts.target).isFile()) {
     const loaded = loadLogsFromFile(opts.target);
@@ -92,19 +86,23 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
     };
   }
 
-  const parsed = parseGitHubRunUrl(opts.target);
-  if (!parsed) {
+  const provider = findProvider(opts.target);
+  if (!provider) {
     throw new Error(
-      `Cannot reproduce "${opts.target}". Provide a GitHub Actions run URL or a local log file path.`,
+      `Cannot reproduce "${opts.target}". Provide a GitHub Actions run URL, a GitLab pipeline/job URL, or a local log file path.`,
     );
   }
-  const provider = new GitHubActionsProvider();
+  const token = resolveProviderToken(provider.id, opts.token);
   const fetched = await provider.fetch(opts.target, { token });
+  const tokenHint =
+    provider.id === "gitlab"
+      ? "Set GITLAB_TOKEN and retry, or download the job trace manually and run: actionrepro ./failure.log"
+      : "Set GITHUB_TOKEN and retry, or download the logs manually and run: actionrepro ./failure.log";
   if (allLogsFailed(fetched.logsByJob)) {
     throw new Error(
       `Cannot build a bundle: ${firstLogError(fetched.logsByJob)} ` +
         `(failing job from metadata: ${failingJobFrom(fetched) ?? "unknown"}). ` +
-        `Set GITHUB_TOKEN and retry, or download the logs manually and run: actionrepro ./failure.log`,
+        tokenHint,
     );
   }
   const red = redactText(fetched.combinedLogs);
@@ -126,14 +124,17 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
     ? "log"
     : "fallback";
   // Best-effort cross-check against the workflow definition at the exact SHA.
+  // GitHub-only: other providers have no workflow-file API wired yet.
   // When the CI-defined step command agrees with the log evidence, the
   // workflow text becomes the repro source and the log stays as evidence.
   let workflow: BundleInput["workflow"];
-  if (fetched.run.headSha && failingStep) {
+  const ghParsed =
+    provider.id === "github-actions" ? parseGitHubRunUrl(opts.target) : null;
+  if (ghParsed && fetched.run.headSha && failingStep) {
     const wf = await fetchWorkflowFile(
-      parsed.owner,
-      parsed.repo,
-      parsed.runId,
+      ghParsed.owner,
+      ghParsed.repo,
+      ghParsed.runId,
       fetched.run.headSha,
       token,
     );

@@ -143,6 +143,19 @@ Token precedence: `--token` flag, then `GITHUB_TOKEN`/`GH_TOKEN` env, then
 `gh auth token` (runs locally, output validated, never printed). `doctor`
 shows which source is active.
 
+GitLab CI works the same way — pass a pipeline or job URL instead of a run
+URL (self-hosted hosts included):
+
+```bash
+actionrepro https://gitlab.com/GROUP/PROJECT/-/pipelines/123
+actionrepro https://gitlab.com/GROUP/PROJECT/-/jobs/456
+export GITLAB_TOKEN=glpat-...   # private projects (or --token); never printed
+```
+
+GitLab notes: statuses map to the same vocabulary (`failed` → `failure`);
+GitLab jobs expose no per-step API, so the failing step comes from log
+extraction alone, and the workflow cross-check is GitHub-only for now.
+
 Authentication notes (verified against the live GitHub API):
 
 - Run/job metadata (including the failing job and step) is public — `inspect`
@@ -347,7 +360,7 @@ src/
   commands/              # inspect.ts reproduce.ts doctor.ts verify.ts history.ts prove.ts
   mcp/                   # protocol.ts tools.ts server.ts (MCP stdio server, zero deps)
   core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts fingerprint.ts workflow.ts history.ts
-  providers/             # types.ts (CiProvider) + github-actions.ts
+  providers/             # types.ts (CiProvider) + github-actions.ts gitlab.ts registry.ts
   ecosystems/            # adapters.ts + registry.ts + types.ts (per-ecosystem behavior)
   utils/                 # fs.ts log.ts version.ts
 test/unit/ test/integration/   # vitest, deterministic fixtures

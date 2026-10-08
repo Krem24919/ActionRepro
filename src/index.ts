@@ -9,6 +9,8 @@ export { detectEcosystem } from "./core/ecosystems.js";
 export { detectRuntime } from "./core/runtime.js";
 export { createBundle, shDq, psDq } from "./core/bundle.js";
 export { GitHubActionsProvider } from "./providers/github-actions.js";
+export { GitLabProvider, parseGitLabUrl } from "./providers/gitlab.js";
+export { findProvider, resolveProviderToken, PROVIDERS } from "./providers/registry.js";
 export {
   allLogsFailed,
   firstLogError,

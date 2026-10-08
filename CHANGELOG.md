@@ -27,6 +27,11 @@ All notable changes to this project will be documented in this file. Format foll
   state — fixed, still-failing, changed-failure, inconclusive, or
   unable-to-reproduce — with CI-friendly exits (0/1/1/2/2). The agent edits
   code; `prove` never does.
+- GitLab CI provider: pipeline and job URLs (gitlab.com and self-hosted)
+  work in `inspect`/`reproduce` like GitHub run URLs, via a provider
+  registry (`findProvider`, `resolveProviderToken`). Token: `--token` flag
+  or `GITLAB_TOKEN` env, never printed. Statuses map to the shared
+  vocabulary; per-step data and the workflow cross-check stay GitHub-only.
 
 ### Fixed
 

@@ -199,7 +199,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     description:
       "Analyze a failed GitHub Actions run URL or a local failure log WITHOUT writing files. " +
       "Returns ecosystem, failure summary, failing job/step, exit code, closest repro command, and redaction count. " +
-      "Use this first to understand a failure. A 'token' argument (or GITHUB_TOKEN env) is only needed to download logs for run URLs; it is never echoed back.",
+      "Use this first to understand a failure. A 'token' argument (or GITHUB_TOKEN / GITLAB_TOKEN env) is only needed to download logs for run URLs; it is never echoed back.",
     inputSchema: {
       type: "object",
       properties: {

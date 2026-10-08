@@ -1,12 +1,11 @@
 import fs from "node:fs";
-import { parseGitHubRunUrl } from "../core/url.js";
-import { GitHubActionsProvider } from "../providers/github-actions.js";
+import { findProvider, resolveProviderToken } from "../providers/registry.js";
 import { loadLogsFromFile } from "../core/logs.js";
 import { redactText } from "../core/redact.js";
 import { extractFailure } from "../core/extract.js";
 import { detectEcosystem } from "../core/ecosystems.js";
 import { detectRuntime } from "../core/runtime.js";
-import { allLogsFailed, firstLogError, resolveToken } from "../core/github.js";
+import { allLogsFailed, firstLogError } from "../core/github.js";
 import type { CiFetchResult } from "../providers/types.js";
 
 function failingStepOf(fetched: CiFetchResult): string | undefined {
@@ -48,8 +47,6 @@ function localProjectFiles(): string[] {
 }
 
 export async function inspectTarget(input: InspectInput): Promise<InspectResult> {
-  const token = resolveToken(input.token);
-
   // Local file mode
   if (fs.existsSync(input.target) && fs.statSync(input.target).isFile()) {
     const loaded = loadLogsFromFile(input.target);
@@ -74,14 +71,14 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
     };
   }
 
-  // GitHub URL mode
-  const parsed = parseGitHubRunUrl(input.target);
-  if (!parsed) {
+  // URL mode: provider dispatch (GitHub Actions, GitLab CI).
+  const provider = findProvider(input.target);
+  if (!provider) {
     throw new Error(
-      `Cannot inspect "${input.target}". Provide a GitHub Actions run URL (https://github.com/OWNER/REPO/actions/runs/ID) or a local log file path.`,
+      `Cannot inspect "${input.target}". Provide a GitHub Actions run URL, a GitLab pipeline/job URL, or a local log file path.`,
     );
   }
-  const provider = new GitHubActionsProvider();
+  const token = resolveProviderToken(provider.id, input.token);
   const fetched = await provider.fetch(input.target, { token });
   const failingJob = fetched.jobs.find((j) => j.conclusion === "failure")?.name;
   if (allLogsFailed(fetched.logsByJob)) {
@@ -94,7 +91,10 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
       summary: `Logs unavailable: ${firstLogError(fetched.logsByJob)}`,
       failingJob,
       failingStep: failingStepOf(fetched),
-      hint: "Set GITHUB_TOKEN and retry, or download the logs manually and run: actionrepro inspect ./failure.log",
+      hint:
+        provider.id === "gitlab"
+          ? "Set GITLAB_TOKEN and retry, or download the job trace manually and run: actionrepro inspect ./failure.log"
+          : "Set GITHUB_TOKEN and retry, or download the logs manually and run: actionrepro inspect ./failure.log",
       redactions: 0,
       runtime: {},
     };

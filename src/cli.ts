@@ -28,7 +28,10 @@ program
 program
   .command("inspect <target>")
   .description("Analyze only: print failure summary without writing files.")
-  .option("--token <token>", "GitHub token (or set GITHUB_TOKEN). Never printed.")
+  .option(
+    "--token <token>",
+    "API token: GitHub (or GITHUB_TOKEN) / GitLab (or GITLAB_TOKEN). Never printed.",
+  )
   .option("--json", "print machine-readable JSON", false)
   .action(async (target: string, opts: { token?: string; json: boolean }) => {
     try {
@@ -47,7 +50,10 @@ program
   .description("Create the actionrepro bundle, optionally execute it.")
   .option("--out <dir>", "output directory", "actionrepro")
   .option("--run", "execute reproduce.sh after generating", false)
-  .option("--token <token>", "GitHub token (or set GITHUB_TOKEN). Never printed.")
+  .option(
+    "--token <token>",
+    "API token: GitHub (or GITHUB_TOKEN) / GitLab (or GITLAB_TOKEN). Never printed.",
+  )
   .option("--json", "print machine-readable JSON", false)
   .action(
     async (
