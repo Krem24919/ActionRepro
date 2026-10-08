@@ -111,6 +111,12 @@ actionrepro reproduce <RUN_URL> --out ./actionrepro --run
 actionrepro verify ./actionrepro ./local-run.log [--json]
 # verdict: REPRODUCED (exit 0), NOT_REPRODUCED (exit 1), INCONCLUSIVE (exit 2)
 
+# Prove a fix in one step (runs the bundle, verifies, records history)
+actionrepro prove ./actionrepro ./local-run.log [--json]
+actionrepro prove ./actionrepro --run [--cwd ./my-repo]
+# state: fixed (exit 0), still-failing / changed-failure (exit 1),
+# inconclusive / unable-to-reproduce (exit 2)
+
 # Check toolchains / network / token
 actionrepro doctor
 actionrepro doctor --json
@@ -236,9 +242,9 @@ reproduced. The script's last line, `result: exit_code=N`, is the exit code
 ## Coding agents (MCP)
 
 `actionrepro mcp` speaks the Model Context Protocol over stdio (spec
-2025-11-25; older versions negotiated), exposing six tools with structured
+2025-11-25; older versions negotiated), exposing seven tools with structured
 JSON results: `inspect`, `reproduce`, `verify`, `fingerprint`, `doctor`,
-`history`. Same functions as the CLI — agents and humans can never disagree about what
+`history`, `prove`. Same functions as the CLI — agents and humans can never disagree about what
 a failure means.
 
 Claude Code (project `.mcp.json`, or `claude mcp add actionrepro -- node
@@ -257,8 +263,9 @@ Claude Code (project `.mcp.json`, or `claude mcp add actionrepro -- node
 
 Suggested agent loop: `history lookup` to check whether this failure is
 already known → `inspect` the failure → `reproduce` it into a bundle
-→ edit code → re-run the bundle command → `verify` the fresh log
-(`mark_fixed` when it stays green).
+→ edit code → `prove` the bundle (`--run` to execute, or pass a fresh log)
+which verifies, records history, and reports fixed / still-failing /
+changed-failure (`mark_fixed` when it stays green).
 `reproduce` defaults to files-only; pass `run: true` only with the user's
 explicit approval (MCP sessions are non-interactive, so the terminal
 confirmation gate is skipped there). Tokens go only to `api.github.com`
@@ -335,9 +342,9 @@ Same input → same output. Fixtures live in [`fixtures/logs/`](fixtures/logs/).
 
 ```
 src/
-  cli.ts                 # commander wiring (default/inspect/reproduce/doctor/verify/mcp)
+  cli.ts                 # commander wiring (inspect/reproduce/doctor/verify/mcp/history/prove + shorthand)
   index.ts               # public library exports
-  commands/              # inspect.ts reproduce.ts doctor.ts verify.ts history.ts
+  commands/              # inspect.ts reproduce.ts doctor.ts verify.ts history.ts prove.ts
   mcp/                   # protocol.ts tools.ts server.ts (MCP stdio server, zero deps)
   core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts fingerprint.ts workflow.ts history.ts
   providers/             # types.ts (CiProvider) + github-actions.ts

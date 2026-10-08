@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file. Format foll
 
 - MCP server (`actionrepro mcp`): stdio JSON-RPC interface (MCP 2025-11-25,
   older versions negotiated) exposing `inspect`, `reproduce`, `verify`,
-  `fingerprint`, `doctor`, and `history` as agent tools with structured
+  `fingerprint`, `doctor`, `history`, and `prove` as agent tools with structured
   JSON results. Zero new dependencies. `reproduce` defaults to files-only;
   `run:true` executes only with the principal's approval.
 - Failure history (`actionrepro history`, MCP `history` tool): append-only
@@ -21,6 +21,12 @@ All notable changes to this project will be documented in this file. Format foll
   fingerprint. Answers same-as-before, occurrence counts, first/last seen,
   fixes, and what changed between occurrences. Record from a log file or
   an existing bundle; noisy-log tolerant (timestamps/versions ignored).
+- Fix loop (`actionrepro prove`, MCP `prove` tool): optionally runs the
+  bundle and captures its output, verifies the fresh log, records the
+  outcome in history (failures re-recorded, fixes marked), and reports one
+  state — fixed, still-failing, changed-failure, inconclusive, or
+  unable-to-reproduce — with CI-friendly exits (0/1/1/2/2). The agent edits
+  code; `prove` never does.
 
 ### Fixed
 

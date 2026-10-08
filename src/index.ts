@@ -37,6 +37,8 @@ export {
   defaultHistoryFile,
 } from "./core/history.js";
 export type { HistoryEntry, HistoryLookup, HistoryStats } from "./core/history.js";
+export { proveFix, formatProveHuman } from "./commands/prove.js";
+export type { ProveInput, ProveResult, ProveState } from "./commands/prove.js";
 export { McpServer, runMcpStdio } from "./mcp/server.js";
 export { MCP_TOOLS } from "./mcp/tools.js";
 export {

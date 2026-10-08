@@ -14,6 +14,7 @@ import {
   formatLookupHuman,
   formatStatsHuman,
 } from "./commands/history.js";
+import { proveFix, formatProveHuman } from "./commands/prove.js";
 import { VERSION } from "./utils/version.js";
 import { redactText } from "./core/redact.js";
 import { sanitizeActionsOutput } from "./utils/log.js";
@@ -123,6 +124,41 @@ program
   });
 
 program
+  .command("prove <bundle> [logfile]")
+  .description(
+    "Verify a fix: optionally run the bundle, verify the fresh log, record history, report the state.",
+  )
+  .option("--run", "execute the bundle and verify its captured output", false)
+  .option("--cwd <dir>", "working directory for --run (the repo under test)")
+  .option("--history-file <file>", "history file (default ~/.actionrepro/history.jsonl)")
+  .option("--json", "print machine-readable JSON", false)
+  .action(
+    async (
+      bundle: string,
+      logfile: string | undefined,
+      opts: { run: boolean; cwd?: string; historyFile?: string; json: boolean },
+    ) => {
+      const r = await proveFix({
+        bundleDir: bundle,
+        logFile: logfile,
+        run: opts.run,
+        runCwd: opts.cwd,
+        historyFile: opts.historyFile,
+      });
+      if (opts.json) console.log(JSON.stringify({ ok: true, ...r }, null, 2));
+      else {
+        console.log(sanitizeActionsOutput(formatProveHuman(r)));
+        process.exitCode =
+          r.state === "fixed"
+            ? 0
+            : r.state === "inconclusive" || r.state === "unable-to-reproduce"
+              ? 2
+              : 1;
+      }
+    },
+  );
+
+program
   .command("history")
   .description("Record and query failure history across runs.")
   .option("--history-file <file>", "history file (default ~/.actionrepro/history.jsonl)")
@@ -196,7 +232,15 @@ program
 // action+options breaks subcommand option parsing in commander.
 // IMPORTANT: every `program.command(...)` name below MUST also appear in
 // KNOWN_SUBCOMMANDS, or the shorthand dispatcher will swallow it as a target.
-const KNOWN_SUBCOMMANDS = ["inspect", "reproduce", "doctor", "verify", "mcp", "history"];
+const KNOWN_SUBCOMMANDS = [
+  "inspect",
+  "reproduce",
+  "doctor",
+  "verify",
+  "mcp",
+  "history",
+  "prove",
+];
 async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
   const first = argv[0];
   if (!first) return false;

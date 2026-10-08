@@ -8,8 +8,12 @@ const ROOT = process.cwd();
 const CLI = path.join(ROOT, "dist/cli.js");
 const fx = (n: string) => path.join(ROOT, "fixtures/logs", n);
 
-function runCli(args: string[], cwd?: string): string {
-  return execFileSync("node", [CLI, ...args], { encoding: "utf8", cwd, timeout: 30000 });
+function runCli(args: string[], cwd?: string, timeoutMs = 30000): string {
+  return execFileSync("node", [CLI, ...args], {
+    encoding: "utf8",
+    cwd,
+    timeout: timeoutMs,
+  });
 }
 
 describe("CLI integration (local fixtures, no network)", () => {
@@ -104,8 +108,12 @@ describe("CLI integration (local fixtures, no network)", () => {
     // for the tool but would make `npm test` fail on an offline machine or in
     // a sandbox that blocks the runner's log host. Toolchain checks must pass;
     // only the network check may fail here.
+    //
+    // doctor spawns a dozen toolchain probes and prints only at the end, so it
+    // needs a generous timeout on loaded machines (a kill before completion
+    // leaves empty stdout, which this test must not mistake for a failure).
     try {
-      const out = runCli(["doctor"]);
+      const out = runCli(["doctor"], undefined, 120000);
       expect(out).toMatch(/doctor: all required checks passed/);
     } catch (e: unknown) {
       const out = String((e as { stdout?: unknown }).stdout ?? "");
@@ -115,5 +123,5 @@ describe("CLI integration (local fixtures, no network)", () => {
         .filter((l) => l.includes("FAIL") && !l.includes("network(api.github.com)"));
       expect(failedRequired).toEqual([]);
     }
-  }, 20000);
+  }, 150000);
 });

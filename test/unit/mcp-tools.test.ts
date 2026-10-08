@@ -23,7 +23,7 @@ function resOf(line: string | null): Record<string, unknown> {
 }
 
 describe("tool catalog", () => {
-  it("exposes exactly the six documented tools in stable order", () => {
+  it("exposes exactly the seven documented tools in stable order", () => {
     expect(MCP_TOOLS.map((t) => t.name)).toEqual([
       "inspect",
       "reproduce",
@@ -31,6 +31,7 @@ describe("tool catalog", () => {
       "fingerprint",
       "doctor",
       "history",
+      "prove",
     ]);
   });
 
@@ -82,6 +83,7 @@ describe("handshake", () => {
       "fingerprint",
       "doctor",
       "history",
+      "prove",
     ]);
   });
 });
@@ -257,6 +259,54 @@ describe("tool calls", () => {
         ),
       );
       expect((bad["result"] as Record<string, unknown>)["isError"]).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("proves still-failing and fixed through the server", async () => {
+    const s = new McpServer();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-mcpprove-"));
+    const historyFile = path.join(dir, "h.jsonl");
+    const cleanLog = path.join(dir, "clean.log");
+    fs.writeFileSync(cleanLog, "All tests passed.\n");
+    const call = async (id: number, args: Record<string, unknown>) => {
+      const r = resOf(
+        await s.handleLine(req(id, "tools/call", { name: "prove", arguments: args })),
+      );
+      return JSON.parse(
+        (
+          (r["result"] as Record<string, unknown>)["content"] as Array<{ text: string }>
+        )[0].text,
+      ) as Record<string, unknown>;
+    };
+    try {
+      const rep = resOf(
+        await s.handleLine(
+          req(30, "tools/call", {
+            name: "reproduce",
+            arguments: { target: fx("npm-fail.log"), outDir: path.join(dir, "bundle") },
+          }),
+        ),
+      );
+      const outDir = (
+        JSON.parse(
+          (
+            (rep["result"] as Record<string, unknown>)["content"] as Array<{
+              text: string;
+            }>
+          )[0].text,
+        ) as Record<string, unknown>
+      )["outDir"] as string;
+      const still = await call(31, {
+        bundleDir: outDir,
+        logFile: fx("npm-fail.log"),
+        historyFile,
+      });
+      expect(still["state"]).toBe("still-failing");
+      expect(still["historyRecorded"]).toBe(true);
+      const fixed = await call(32, { bundleDir: outDir, logFile: cleanLog, historyFile });
+      expect(fixed["state"]).toBe("fixed");
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

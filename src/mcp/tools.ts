@@ -28,6 +28,7 @@ import {
   recordLog as historyRecordLog,
   stats as historyStats,
 } from "../commands/history.js";
+import { proveFix } from "../commands/prove.js";
 
 export interface TextBlock {
   type: "text";
@@ -331,6 +332,52 @@ export const MCP_TOOLS: McpToolDef[] = [
       required: ["action"],
     },
     handler: handleHistory,
+  },
+  {
+    name: "prove",
+    description:
+      "Close the fix loop in one call: optionally execute the bundle (run:true, captured), " +
+      "verify the fresh log against it, record the outcome in history, and report one state: " +
+      "fixed, still-failing, changed-failure, inconclusive, or unable-to-reproduce. " +
+      "The agent edits code between reproduce and prove; prove never edits code itself. " +
+      "Set run:true ONLY with the principal's explicit approval (executes locally, non-interactive).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        bundleDir: {
+          type: "string",
+          description: "Bundle directory created by the reproduce tool.",
+        },
+        logFile: {
+          type: "string",
+          description: "Fresh log file. Required unless run:true.",
+        },
+        run: {
+          type: "boolean",
+          description:
+            "Execute the bundle and verify its output. Default false. Requires principal approval.",
+        },
+        runCwd: {
+          type: "string",
+          description: "Working directory for run (the repo under test).",
+        },
+        historyFile: {
+          type: "string",
+          description: "History file path. Default ~/.actionrepro/history.jsonl.",
+        },
+      },
+      required: ["bundleDir"],
+    },
+    handler: async (args) =>
+      ok(
+        await proveFix({
+          bundleDir: needStr(args, "bundleDir"),
+          logFile: optStr(args, "logFile"),
+          run: optBool(args, "run") ?? false,
+          runCwd: optStr(args, "runCwd"),
+          historyFile: optStr(args, "historyFile"),
+        }),
+      ),
   },
 ];
 
