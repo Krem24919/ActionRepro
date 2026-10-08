@@ -75,8 +75,10 @@ describe("prove CLI (isolated history file, no network)", () => {
     const outDir = path.join(tmp, "bundle");
     try {
       runCli(["reproduce", fx("npm-fail.log"), "--out", outDir]);
-      // Replace the bundle script with a harmless stand-in (exit 0, no failure).
+      // Replace the bundle scripts with harmless stand-ins (exit 0, no
+      // failure). Both flavors: Windows runs reproduce.ps1, rest run .sh.
       fs.writeFileSync(outDir + "/reproduce.sh", "#!/bin/sh\necho all-green\n");
+      fs.writeFileSync(outDir + "/reproduce.ps1", 'Write-Output "all-green"\n');
       const r = runCliCode([
         "prove",
         outDir,
