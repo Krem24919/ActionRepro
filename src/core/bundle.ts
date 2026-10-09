@@ -77,9 +77,12 @@ function psText(s: string): string {
 function installBlock(eco: EcosystemInfo): string {
   switch (eco.id) {
     case "npm":
-      return ["if [ -f package-lock.json ]; then npm ci; else npm install; fi"].join(
-        "\n",
-      );
+      // `npm ci` and `npm install` both delete extraneous packages from node_modules (and `npm ci`
+      // deletes the whole directory first), so an existing node_modules is kept unless the user
+      // asks for a reinstall. A clean CI checkout has no node_modules and installs as before.
+      return [
+        'if [ -d node_modules ] && [ -z "${ACTIONREPRO_REINSTALL:-}" ]; then echo "==> [actionrepro] node_modules exists: skipping npm install (set ACTIONREPRO_REINSTALL=1 to reinstall)"; elif [ -f package-lock.json ]; then npm ci; else npm install; fi',
+      ].join("\n");
     case "pnpm":
       return [
         'if ! command -v pnpm >/dev/null 2>&1; then echo "TOOL_MISSING: pnpm not found. Install it first: npm install -g pnpm (Termux: npm install -g pnpm)"; exit 2; fi',
@@ -323,7 +326,7 @@ exit ${EXIT_NO_COMMAND}`;
 function psInstall(eco: EcosystemInfo): string {
   switch (eco.id) {
     case "npm":
-      return `if (Test-Path package-lock.json) { npm ci } else { npm install }`;
+      return `if ((Test-Path node_modules) -and -not $env:ACTIONREPRO_REINSTALL) { Write-Host "==> [actionrepro] node_modules exists: skipping npm install (set ACTIONREPRO_REINSTALL=1 to reinstall)" } elseif (Test-Path package-lock.json) { npm ci } else { npm install }`;
     case "pnpm":
       return `pnpm install --frozen-lockfile`;
     case "yarn":
