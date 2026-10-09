@@ -74,6 +74,8 @@ runs:
         fi
         # Per-run temp file (RUNNER_TEMP is private to this job, unlike a fixed /tmp path).
         JSON_FILE="$(mktemp "${RUNNER_TEMP:-/tmp}/actionrepro.XXXXXX.json")"
+        # Remove the JSON on every exit, including a failed reproduce under set -e (the later rm alone is skipped then).
+        trap 'rm -f "$JSON_FILE"' EXIT
         node "${{ github.action_path }}/dist/cli.js" reproduce "$TARGET" --out "$ACTIONREPRO_OUT" --json > "$JSON_FILE"
         # Values are passed through the environment, never spliced into the JavaScript source,
         # so a quote in the input (for example an apostrophe in the out path) cannot break or inject code.

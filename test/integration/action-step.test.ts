@@ -94,6 +94,31 @@ describe("action.yml repro step (end-to-end)", () => {
     expect(r.leftoverJson).toEqual([]);
   });
 
+  it("a failing log-file run still removes the temp JSON (the rm after the outputs is skipped)", () => {
+    const cwd = fs.mkdtempSync(path.join(work, "run-"));
+    const r = runStep(
+      { ACTIONREPRO_LOG: path.join(cwd, "no-such.log"), ACTIONREPRO_OUT: "b3" },
+      cwd,
+    );
+    expect(r.status).not.toBe(0);
+    expect(r.leftoverJson).toEqual([]);
+  });
+
+  it("a failing run-url (unreachable API, no network needed) still removes the temp JSON", () => {
+    const cwd = fs.mkdtempSync(path.join(work, "run-"));
+    // Port 9 on loopback refuses the connection at once; the step must fail and clean up.
+    const r = runStep(
+      {
+        ACTIONREPRO_URL: "https://127.0.0.1:9/acme/app/actions/runs/1",
+        ACTIONREPRO_OUT: "b4",
+      },
+      cwd,
+    );
+    expect(r.status).not.toBe(0);
+    expect(r.stderr.length).toBeGreaterThan(0);
+    expect(r.leftoverJson).toEqual([]);
+  });
+
   it("missing both run-url and log-file exits 2 with a clear message", () => {
     const cwd = fs.mkdtempSync(path.join(work, "run-"));
     const r = runStep({}, cwd);
