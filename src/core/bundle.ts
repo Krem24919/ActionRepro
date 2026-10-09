@@ -520,15 +520,22 @@ export function createBundle(input: BundleInput, outDir: string): BundleResult {
   const readme = buildBundleReadme(input);
   const failure = buildFailureTxt(input);
   const envTxt = buildEnvironmentTxt(input);
+  // Final safety pass: every file is redacted exactly once, here, and the bytes written to disk
+  // are these same strings. The integrity hash is computed over them, so it always matches disk.
+  // (Hashing the pre-redaction text would diverge from disk whenever a secret reached the builder.)
+  const finalText = {
+    "reproduce.sh": redactText(sh).text,
+    "reproduce.ps1": redactText(ps1).text,
+    "failure.txt": redactText(failure).text,
+    "environment.txt": redactText(envTxt).text,
+  };
   // Integrity hash covers the content files. repro.json is excluded on
   // purpose: it carries this hash, so including it would be circular.
-  // (Redaction is idempotent on already-redacted content, so the hash also
-  // matches the bytes on disk after the final safety pass in write().)
   const bundleSha256 = hashBundleFiles([
-    { name: "reproduce.sh", content: sh },
-    { name: "reproduce.ps1", content: ps1 },
-    { name: "failure.txt", content: failure },
-    { name: "environment.txt", content: envTxt },
+    { name: "reproduce.sh", content: finalText["reproduce.sh"] },
+    { name: "reproduce.ps1", content: finalText["reproduce.ps1"] },
+    { name: "failure.txt", content: finalText["failure.txt"] },
+    { name: "environment.txt", content: finalText["environment.txt"] },
   ]);
   const meta = {
     tool: "actionrepro",
@@ -554,7 +561,6 @@ export function createBundle(input: BundleInput, outDir: string): BundleResult {
     generatedAt: new Date().toISOString(),
   };
 
-  // Final safety: redact every file once more before writing.
   const write = (name: string, content: string, executable = false) => {
     const safe = redactText(content).text;
     const fp = `${outDir}/${name}`;
@@ -569,11 +575,11 @@ export function createBundle(input: BundleInput, outDir: string): BundleResult {
     files.push(fp);
   };
 
-  write("reproduce.sh", sh, true);
-  write("reproduce.ps1", ps1);
+  write("reproduce.sh", finalText["reproduce.sh"], true);
+  write("reproduce.ps1", finalText["reproduce.ps1"]);
   write("README.md", readme);
-  write("failure.txt", failure);
-  write("environment.txt", envTxt);
+  write("failure.txt", finalText["failure.txt"]);
+  write("environment.txt", finalText["environment.txt"]);
   write("repro.json", JSON.stringify(meta, null, 2) + "\n");
   write(
     "bundle.sha256",
