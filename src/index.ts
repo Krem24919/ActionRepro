@@ -47,3 +47,4 @@ export {
   SUPPORTED_PROTOCOL_VERSIONS,
   PREFERRED_PROTOCOL_VERSION,
 } from "./mcp/protocol.js";
+export { VERSION } from "./utils/version.js";

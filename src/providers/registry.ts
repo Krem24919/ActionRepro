@@ -8,9 +8,19 @@ export const PROVIDERS: CiProvider[] = [
   new GitLabProvider(),
 ];
 
-/** First provider whose URL shape matches, or undefined for local files/unknown input. */
+/**
+ * The provider whose URL shape matches, or undefined for local files/unknown input.
+ * Provider URL shapes must not overlap: an input matching two providers is an error, because
+ * silently taking the first one could send the request (and the token) to the wrong service.
+ */
 export function findProvider(input: string): CiProvider | undefined {
-  return PROVIDERS.find((p) => p.matches(input));
+  const matches = PROVIDERS.filter((p) => p.matches(input));
+  if (matches.length > 1) {
+    throw new Error(
+      `Ambiguous CI provider for ${input}: ${matches.map((m) => m.id).join(", ")}. Use a local log file instead.`,
+    );
+  }
+  return matches[0];
 }
 
 /**
