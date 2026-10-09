@@ -11,25 +11,25 @@ Each fix is a separate commit. The commit subjects and bodies carry the same mea
 
 - Two rounds of work. Round one (`bc646c0`, `724bd89`, `950d21d`) covered exit codes, log extraction, redaction, bundle scripts, MCP output, and GitLab pagination. Round two covers everything still open in §3: scoring, dead code, action glue, runner timeout, node_modules, GitHub pagination and encoding, history, bundle integrity, MCP buffering, runtime parsing, workflow parsing, redaction, Enterprise hosts with a token policy, and the registry guard.
 - **Security:** one issue was found by measurement while implementing Enterprise support. An environment `GITHUB_TOKEN` would have been sent to any host once arbitrary hosts were accepted. It was caught and fixed before it was committed, so no released version has it. The baseline never sent a token off `github.com`, because the baseline rejected every other host. See §2 R28 to R30 and §3 item 36.
-- **Regression found and fixed:** round one (`950d21d`) let `Authorization: Basic dXNlcjpwYXNz` through unredacted, while the baseline redacted it (R20). Fixed in `02d1588`. Round one's claim that the Basic rule was safe was wrong, and this report corrects it.
-- **Verified:** typecheck, lint, format, build, and 471 of 471 tests (53 files). `bench` passes 9 of 9. `smoke` passes every step when the sandbox CA bundle is set (`NODE_EXTRA_CA_CERTS`). Each of the 14 round-two commits compiles on its own (`tsc --noEmit` on `git archive` of each commit).
+- **Regression found and fixed:** round one (`950d21d`) let `Authorization: Basic dXNlcjpwYXNz` through unredacted, while the baseline redacted it (R20). Fixed in `02d1588`. The round-one redaction change introduced this leak. It was not caught by the round-one tests, and this report records it.
+- **Verified:** typecheck, lint, format, build, and 473 of 473 tests (53 files). `bench` passes 9 of 9. `smoke` passes every step when the sandbox CA bundle is set (`NODE_EXTRA_CA_CERTS`). Each of the 14 round-two commits compiles on its own (`tsc --noEmit` on `git archive` of each commit).
 - **Coverage** (vitest 2.1.9 with v8, measured ad hoc, not committed): statements 70.4% → 84.2%, branches 77.0% → 84.1%, functions 84.9% → 97.0%.
 - **Behaviour changes that you should review** (listed in §7): the default `reproduce --run` no longer reinstalls an existing `node_modules`; the runner has a 30-minute default limit; tokens for Enterprise hosts need `GH_HOST`; `history record` refuses blank logs; the ecosystem threshold moved from 10 to 8.
 - **Still open** (§8): Windows is untested. A bare lowercase 16-character secret without a header is not redacted. Detached grandchildren are not killed on timeout. The no-TTY auto-run is kept as you decided.
 
 ## 1. Results at a glance
 
-| Check                                      | Baseline `ec66a64`   | Round one `950d21d`                                  | This branch                                                                                                                                           |
-| ------------------------------------------ | -------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck`                        | pass                 | pass                                                 | **pass**                                                                                                                                              |
-| `npm run lint` (`--max-warnings 0`)        | pass                 | pass                                                 | **pass**                                                                                                                                              |
-| `npm run format`                           | pass                 | pass                                                 | **pass**                                                                                                                                              |
-| `npm run build`                            | pass                 | pass                                                 | **pass**                                                                                                                                              |
-| `npx vitest run`                           | 182 / 182 (26 files) | 267 / 267 (32 files)                                 | **471 / 471 (53 files)**                                                                                                                              |
-| Coverage statements / branches / functions | not measured         | 70.4% / 77.0% / 84.9%                                | **84.2% / 84.1% / 97.0%**                                                                                                                             |
-| `npm run bench`                            | PASS 9/9             | not re-run                                           | **PASS 9/9** (avg ms: inspect 88, reproduce 97, verify 87)                                                                                            |
-| `npm run smoke`                            | not run              | fails only at `doctor`'s network check (sandbox TLS) | **all steps pass** with `NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt`; without it, the sandbox's TLS interception fails `doctor` as before |
-| Commits compile on their own               | —                    | —                                                    | **14 of 14** round-two commits (`tsc --noEmit` on each commit's `git archive`)                                                                        |
+| Check                                      | Baseline `ec66a64`   | Round one `950d21d`                             | This branch                                                                                                                                           |
+| ------------------------------------------ | -------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`                        | pass                 | pass                                            | **pass**                                                                                                                                              |
+| `npm run lint` (`--max-warnings 0`)        | pass                 | pass                                            | **pass**                                                                                                                                              |
+| `npm run format`                           | pass                 | pass                                            | **pass**                                                                                                                                              |
+| `npm run build`                            | pass                 | pass                                            | **pass**                                                                                                                                              |
+| `npx vitest run`                           | 182 / 182 (26 files) | 267 / 267 (32 files)                            | **473 / 473 (53 files)**                                                                                                                              |
+| Coverage statements / branches / functions | not measured         | 70.4% / 77.0% / 84.9%                           | **84.2% / 84.1% / 97.0%**                                                                                                                             |
+| `npm run bench`                            | not measured         | not re-run                                      | **PASS 9/9** (avg ms: inspect 84, reproduce 90, verify 80)                                                                                            |
+| `npm run smoke`                            | not measured         | fails at `doctor`'s network check (sandbox TLS) | **all steps pass** with `NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt`; without it, the sandbox's TLS interception fails `doctor` as before |
+| Commits compile on their own               | —                    | —                                               | **14 of 14** round-two code commits (`tsc --noEmit` on each commit's `git archive`)                                                                   |
 
 Baseline counts are from `ec66a64`, the baseline test suite. The round-one "48 of 152 touched tests fail on baseline" figure is kept in §4 for history.
 
@@ -68,7 +68,7 @@ Round one also re-measured the MCP `reproduce` with `run:true` on a failing exit
 | R6  | 1234 jobs in pages of 100 (stubbed API)                                                                                                                                      | 1000 of 1234 jobs in 10 requests                                               | same as BASE                                                       | **1234 of 1234 in 13 requests**                                                                                          | `7bbb4c6` |
 | R7  | Workflow path `.github/workflows/my ci#1?.yml`                                                                                                                               | URL truncated at `#`                                                           | same                                                               | encoded (`%23`, `%3F`, `%20`)                                                                                            | `7bbb4c6` |
 | R8  | History entry without `fpv`, looked up with a new fingerprint                                                                                                                | `legacyEntries = 0`                                                            | same                                                               | **`legacyEntries = 1`**                                                                                                  | `76e2fe9` |
-| R9  | Blank log passed to `history record`                                                                                                                                         | —                                                                              | recorded as a failure, summary `Empty logs: no failure found`      | **refused** with `no failure content found`                                                                              | `76e2fe9` |
+| R9  | Blank log passed to `history record`                                                                                                                                         | recorded `Empty logs: no failure found` (exit 0, measured)                     | same as BASE (measured)                                            | **refused** with `no failure content found`, exit 1, no file written                                                     | `76e2fe9` |
 | R10 | Bundle hash, library call with a raw token in `failure.summary` and `errorLines`                                                                                             | differs from disk                                                              | differs from disk                                                  | **matches disk**; raw token absent from every file                                                                       | `ee7686d` |
 | R11 | Bundle hash, CLI call with `secrets.log`                                                                                                                                     | matches                                                                        | matches                                                            | matches (the CLI redacts earlier)                                                                                        | —         |
 | R12 | 11 MiB stdin line followed by `ping` id 2                                                                                                                                    | 3 response lines (error, a stray `Invalid JSON.` from the tail, ping result)   | —                                                                  | **2 lines** (error, ping result)                                                                                         | `8ad104e` |
@@ -91,6 +91,8 @@ Round one also re-measured the MCP `reproduce` with `run:true` on a failing exit
 | R29 | Same, with `GH_HOST=<host>`                                                                                                                                                  | —                                                                              | —                                                                  | token sent to that host only                                                                                             | `7bbb4c6` |
 | R30 | URL on an unknown host, `GITHUB_TOKEN=ENV-SECRET` in the environment                                                                                                         | 0 requests (rejected)                                                          | —                                                                  | 1 request, **no Authorization**. The first draft of the Enterprise change sent `Authorization` to that host (§3 item 36) | `7bbb4c6` |
 | R31 | Registry ambiguity: 8 sample inputs                                                                                                                                          | —                                                                              | first match only                                                   | at most one provider per input; two matches now throw                                                                    | `b11e8ab` |
+| R32 | Step fails (reproduce exits non-zero): temp JSON left behind                                                                                                                 | `/tmp/actionrepro.json` (fixed path) left behind, never removed (measured)     | same fixed path, left behind (measured)                            | 1 file left in `RUNNER_TEMP` before the trap; **0** after                                                                | `56674a0` |
+| R33 | run-url success path, local GHE stub (run, jobs, logs, workflow, contents)                                                                                                   | rejected: GHE URL not accepted (R28)                                           | —                                                                  | exit 0, 3 output blocks, 0 files left (measured). github.com success is not measurable here (§8)                         | `56674a0` |
 
 Carried-over checks for round two: every fixture log still produces valid bash (`bash -n`), and the 15 original workflow and ecosystem tests still pass.
 
@@ -148,7 +150,7 @@ Status: **Fixed** means the fix is committed and measured. **Decision** means th
 
 25. **`src/ecosystems/` was a second, disagreeing copy of the ecosystem data.** It had no importers (grep found self-references only), and its Gradle commands differed from `core/ecosystems.ts`. _Fixed_ (`cbdcacb`): deleted. The `ARCHITECTURE.md` and `README.md` tree entries were removed too.
 
-26. **`action.yml` spliced `OUT_DIR` into a `node -e` JavaScript string.** Measured: a payload in the out-dir input did not run only because of a `??` short-circuit, and an apostrophe made the step fail with exit 1. This is fragile and latent (it would run if `outDir` were ever absent), and it is not an active injection today. _Fixed_ (`5e0709f`): inputs pass through `env` and argv, `GITHUB_OUTPUT` uses random heredoc delimiters, the JSON goes to `RUNNER_TEMP` and is deleted. Measured: R26, R27. Test: `test/integration/action-step.test.ts` runs the real step script.
+26. **`action.yml` spliced `OUT_DIR` into a `node -e` JavaScript string.** Measured: a payload in the out-dir input did not run only because of a `??` short-circuit, and an apostrophe made the step fail with exit 1. This is fragile and latent (it would run if `outDir` were ever absent), and it is not an active injection today. _Fixed_ (`5e0709f`): inputs pass through `env` and argv, `GITHUB_OUTPUT` uses random heredoc delimiters, the JSON goes to `RUNNER_TEMP` and is deleted. Measured: R26, R27. Test: `test/integration/action-step.test.ts` runs the real step script. Later, in `56674a0`: a failing reproduce exited before the plain `rm`, so the JSON stayed in `RUNNER_TEMP` (R32). A trap on EXIT now removes it on every exit path; two new integration tests fail without it and pass with it.
 
 27. **`runner.ts` had no time limit.** A hung repro hung the CLI. _Fixed_ (`4334e25`): default 30 minutes, `ACTIONREPRO_TIMEOUT_MS` overrides (`0` disables), exit 124. Measured: R3. _Limit:_ only the direct bash child is killed. Detached grandchildren keep running. Test: `test/unit/runner-timeout.test.ts`.
 
@@ -184,29 +186,29 @@ Round one (carried over): `redact-rules` (12), `extract-groups` (6), `selection`
 
 Round two, new files (test counts from the final run):
 
-| File                                           | Tests | Covers                                                                                          |
-| ---------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------- |
-| `test/unit/ecosystems-scoring.test.ts`         | 10    | per-kind scoring, 5 regression fixtures, stacking                                               |
-| `test/unit/runner-timeout.test.ts`             | 15    | `resolveRunTimeoutMs`, exit 124 on a hung script, missing script                                |
-| `test/unit/bundle-integrity.test.ts`           | 5     | hash equals disk with a raw token, no raw token in files, install guard text                    |
-| `test/unit/history-command.test.ts`            | 16    | `recordLog`, `markFixed`, `lookup`, `stats`, legacy counts, formatters                          |
-| `test/unit/mcp-server.test.ts`                 | 15    | every JSON-RPC branch, oversize, ordering                                                       |
-| `test/unit/runtime-os.test.ts`                 | 10    | banner layouts, arch labels, build flags                                                        |
-| `test/unit/workflow-yaml.test.ts`              | 11    | 4-space scoping, matrix suffix, invalid and alias-bomb YAML                                     |
-| `test/unit/redact-header.test.ts`              | 10    | header rule, Digest, quoted JSON, idempotence, shape rules, documented limit                    |
-| `test/unit/url-enterprise.test.ts`             | 20    | host parsing, API base, token policy                                                            |
-| `test/unit/github-api.test.ts`                 | 25    | pagination (1234 jobs, empty page, cap), encoding, token policy, error messages, workflow by id |
-| `test/unit/github-provider-fetch.test.ts`      | 6     | the provider maps run, jobs, steps, logs; token policy                                          |
-| `test/unit/commands-url-mode.test.ts`          | 6     | inspect and reproduce on a stubbed run: workflow cross-check, log failure, Enterprise           |
-| `test/unit/registry.test.ts`                   | 8     | routing, no overlap, ambiguity guard, token resolution                                          |
-| `test/unit/utils-log-index.test.ts`            | 9     | log helpers, `ensureDir`, public exports, `VERSION`                                             |
-| `test/unit/commands-inspect-reproduce.test.ts` | 9     | inspect, reproduce, formatter, no secrets in outputs                                            |
-| `test/unit/prove-format.test.ts`               | 13    | `scriptNotRunReason`, every state's output                                                      |
-| `test/unit/doctor-format.test.ts`              | 2     | PASS/FAIL output                                                                                |
-| `test/integration/action-step.test.ts`         | 8     | the real `action.yml` step: inputs, quoting, injection, cleanup, GITHUB_OUTPUT                  |
-| `test/integration/mcp-oversize.test.ts`        | 2     | 11 MiB line over stdio; normal session stdout is JSON                                           |
-| `test/integration/node-modules.test.ts`        | 3     | node_modules kept, reinstall override, MCP `run:true` path                                      |
-| `test/integration/prove-run.test.ts`           | 1     | `prove --run` end to end in a scratch project                                                   |
+| File                                           | Tests | Covers                                                                                                   |
+| ---------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------- |
+| `test/unit/ecosystems-scoring.test.ts`         | 10    | per-kind scoring, 5 regression fixtures, stacking                                                        |
+| `test/unit/runner-timeout.test.ts`             | 15    | `resolveRunTimeoutMs`, exit 124 on a hung script, missing script                                         |
+| `test/unit/bundle-integrity.test.ts`           | 5     | hash equals disk with a raw token, no raw token in files, install guard text                             |
+| `test/unit/history-command.test.ts`            | 16    | `recordLog`, `markFixed`, `lookup`, `stats`, legacy counts, formatters                                   |
+| `test/unit/mcp-server.test.ts`                 | 15    | every JSON-RPC branch, oversize, ordering                                                                |
+| `test/unit/runtime-os.test.ts`                 | 10    | banner layouts, arch labels, build flags                                                                 |
+| `test/unit/workflow-yaml.test.ts`              | 11    | 4-space scoping, matrix suffix, invalid and alias-bomb YAML                                              |
+| `test/unit/redact-header.test.ts`              | 10    | header rule, Digest, quoted JSON, idempotence, shape rules, documented limit                             |
+| `test/unit/url-enterprise.test.ts`             | 20    | host parsing, API base, token policy                                                                     |
+| `test/unit/github-api.test.ts`                 | 25    | pagination (1234 jobs, empty page, cap), encoding, token policy, error messages, workflow by id          |
+| `test/unit/github-provider-fetch.test.ts`      | 6     | the provider maps run, jobs, steps, logs; token policy                                                   |
+| `test/unit/commands-url-mode.test.ts`          | 6     | inspect and reproduce on a stubbed run: workflow cross-check, log failure, Enterprise                    |
+| `test/unit/registry.test.ts`                   | 8     | routing, no overlap, ambiguity guard, token resolution                                                   |
+| `test/unit/utils-log-index.test.ts`            | 9     | log helpers, `ensureDir`, public exports, `VERSION`                                                      |
+| `test/unit/commands-inspect-reproduce.test.ts` | 9     | inspect, reproduce, formatter, no secrets in outputs                                                     |
+| `test/unit/prove-format.test.ts`               | 13    | `scriptNotRunReason`, every state's output                                                               |
+| `test/unit/doctor-format.test.ts`              | 2     | PASS/FAIL output                                                                                         |
+| `test/integration/action-step.test.ts`         | 10    | the real `action.yml` step: inputs, quoting, injection, cleanup on success and on failure, GITHUB_OUTPUT |
+| `test/integration/mcp-oversize.test.ts`        | 2     | 11 MiB line over stdio; normal session stdout is JSON                                                    |
+| `test/integration/node-modules.test.ts`        | 3     | node_modules kept, reinstall override, MCP `run:true` path                                               |
+| `test/integration/prove-run.test.ts`           | 1     | `prove --run` end to end in a scratch project                                                            |
 
 Existing files changed in round two: `test/unit/url.test.ts` (expectation now includes `host` and `apiBase`).
 
@@ -244,6 +246,7 @@ These follow from the fixes. Each one is deliberate, and each one is in a commit
 - **Repro scripts auto-run on non-TTY stdin** (§6, maintainer decision).
 - **`McpServer` and `runMcpStdio` have no separate versioning contract**, beyond the package version.
 - **Sandbox TLS** prevents `doctor`'s network check from passing without `NODE_EXTRA_CA_CERTS`. This is environmental, not a code issue.
+- **Run-URL success on github.com cannot be measured in this sandbox.** The sandbox allows `api.github.com` but not the blob storage host. The log download answers 302 to `productionresultssa*.blob.core.windows.net` (measured). The success path was measured against a local GitHub Enterprise stub (`GH_HOST`, self-signed certificate; not committed). Unit tests cover the same API parsing with a stubbed `fetch`.
 - **`cli.ts` coverage** is measured only through the integration tests (§4).
 
 ## 9. How to verify
@@ -251,9 +254,32 @@ These follow from the fixes. Each one is deliberate, and each one is in a commit
 ```bash
 npm ci
 npm run typecheck && npm run lint && npm run format && npm run build
-npx vitest run                       # 471 tests, 53 files
+npx vitest run                       # 473 tests, 53 files
 npm run bench                        # PASS 9/9
 NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt npm run smoke   # sandbox TLS only
 ```
 
 Baselines are rebuilt with `git archive <commit> | tar -x -C <dir>` and `tsc`, using the same `node_modules`. Per-commit compilation was checked with `tsc --noEmit` on each commit's archive.
+
+## 10. Commits on this branch
+
+Round two, oldest first. Hashes are the final ones on `arena/54eaaebb-actionrepro`, for the commits listed here. The branch's last commit adds this report and is not in the table.
+
+| Commit    | Subject                                                                               |
+| --------- | ------------------------------------------------------------------------------------- |
+| `a9ab6c1` | ecosystems: score each kind by its strongest signal, threshold high>=8                |
+| `cbdcacb` | dead code: remove unused src/ecosystems adapter registry                              |
+| `5e0709f` | action.yml: pass inputs through env, delimiter-safe GITHUB_OUTPUT, per-run temp JSON  |
+| `4334e25` | runner: time limit for the repro script (exit 124)                                    |
+| `24d6964` | bundle: keep an existing node_modules instead of wiping it with npm ci                |
+| `ee7686d` | bundle: hash the redacted text that is written to disk                                |
+| `76e2fe9` | history: report legacy entries and refuse blank logs                                  |
+| `8ad104e` | mcp: discard an oversized stdin line instead of parsing its tail                      |
+| `5737c43` | runtime: parse the runner OS from real log layouts and only labelled arch lines       |
+| `d6be1c5` | workflow: use the yaml package; fix 4-space indentation and job scoping               |
+| `02d1588` | redaction: redact Authorization header values and keep prose; tighten the shape rules |
+| `7bbb4c6` | github: Enterprise hosts, token policy, job pagination and path encoding              |
+| `b11e8ab` | registry: fail on ambiguous provider matches; export VERSION from the library         |
+| `6d8ccf9` | tests: cover inspect, reproduce, prove --run and doctor output                        |
+| `5c02c86` | docs: correct AUDIT_REPORT, document Enterprise tokens, timeout and reinstall         |
+| `56674a0` | action.yml: remove the temp JSON on every exit, not only on success                   |
