@@ -1,0 +1,6 @@
+2024-05-02T11:00:00.0000000Z ##[group]Run npm test
+2024-05-02T11:00:01.0000000Z > app@1.0.0 test
+2024-05-02T11:00:01.0000000Z > vitest run
+2024-05-02T11:00:02.0000000Z pip install -q pyodbc-stub (postinstall)
+2024-05-02T11:00:02.0000000Z requirements.txt was not used
+2024-05-02T11:00:03.0000000Z ##[error]Process completed with exit code 1.

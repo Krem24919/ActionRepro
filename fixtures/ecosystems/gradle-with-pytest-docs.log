@@ -1,0 +1,5 @@
+2024-05-02T11:00:00.0000000Z ##[group]Run ./gradlew test
+2024-05-02T11:00:01.0000000Z > Task :test FAILED
+2024-05-02T11:00:01.0000000Z FAILURE: Build failed with an exception.
+2024-05-02T11:00:02.0000000Z Docs build step uses pytest and requirements.txt (not run)
+2024-05-02T11:00:03.0000000Z ##[error]Process completed with exit code 1.

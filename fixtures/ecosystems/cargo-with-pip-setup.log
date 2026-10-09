@@ -1,0 +1,7 @@
+2024-05-02T11:00:00.0000000Z ##[group]Run pip install maturin
+2024-05-02T11:00:01.0000000Z Collecting maturin
+2024-05-02T11:00:02.0000000Z ##[group]Run cargo test --lib
+2024-05-02T11:00:03.0000000Z Traceback (most recent call last):
+2024-05-02T11:00:03.0000000Z   File "/usr/lib/python3/dist-packages/apt_pkg.py", line 2, in <module>
+2024-05-02T11:00:04.0000000Z some-crate: 1 test failed
+2024-05-02T11:00:05.0000000Z ##[error]Process completed with exit code 101.
