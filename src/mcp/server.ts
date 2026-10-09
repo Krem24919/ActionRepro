@@ -150,6 +150,9 @@ function toolErrorResult(message: string): ToolResult {
 export async function runMcpStdio(server: McpServer = new McpServer()): Promise<void> {
   process.stdin.setEncoding("utf8");
   let buffer = "";
+  // After an oversized message we answer once, then drop the rest of that message up to its
+  // newline. Without this, the tail of the message would be parsed as a second, bogus request.
+  let discarding = false;
   const flushLine = async (line: string): Promise<void> => {
     if (line === "") return;
     // handleLine only throws on unexpected internal failures; protocol-level
@@ -158,18 +161,29 @@ export async function runMcpStdio(server: McpServer = new McpServer()): Promise<
     if (out !== null) process.stdout.write(`${out}\n`);
   };
   for await (const chunk of process.stdin) {
-    buffer += chunk;
-    if (Buffer.byteLength(buffer, "utf8") > MAX_LINE_BYTES + 1024) {
+    let data = chunk as string;
+    if (discarding) {
+      const nl = data.indexOf("\n");
+      if (nl === -1) continue; // still inside the oversized message
+      data = data.slice(nl + 1);
+      discarding = false;
+    }
+    const { lines, rest } = splitLines(buffer + data);
+    buffer = rest;
+    for (const line of lines) await flushLine(line);
+    // Code units are a lower bound for UTF-8 bytes, so only measure bytes when the length is close.
+    if (
+      buffer.length * 3 > MAX_LINE_BYTES &&
+      Buffer.byteLength(buffer, "utf8") > MAX_LINE_BYTES
+    ) {
       process.stdout.write(
         `${errorLine(null, ErrorCodes.ParseError, "Input exceeds size limit.")}\n`,
       );
       buffer = "";
-      continue;
+      discarding = true;
     }
-    const { lines, rest } = splitLines(buffer);
-    buffer = rest;
-    for (const line of lines) await flushLine(line);
   }
+  if (discarding) return;
   const tail = buffer.trim();
   if (tail) await flushLine(tail);
 }
