@@ -158,8 +158,8 @@ that nothing else reaches `process.stdout`.
 
 ### Known issues found but NOT fixed (need a decision or more verification)
 
-- **Repro scripts run the CI command without a prompt when stdin is not a TTY.** This is a security
-  decision, so it was not changed. See §6.
+- **Repro scripts run the CI command without a prompt when stdin is not a TTY.** Maintainer decision: keep
+  as is (see §6).
 - **`reproduce --run` and MCP `run:true` run the bundle's install step in the current directory.**
   For npm repos that is `npm ci`, which deletes `node_modules` first. This caused the incident in §5.
   Consider requiring an explicit `--cwd` for `--run`.
@@ -210,8 +210,10 @@ in `/tmp/base` hit the same issue and was rebuilt from scratch.
 succeeds. This is environmental and comes from the same `fetch` call as before the change. The rest of
 the smoke script passes when that one step is skipped.
 
-## 6. Decision needed from the maintainer
+## 6. Decision on the no-TTY auto-run
 
 Repro scripts auto-run the CI command without a prompt when stdin is not a TTY (`[ -t 0 ]` check).
 That is documented, but in CI or any non-interactive environment it executes untrusted CI text.
-Recommendation: fail closed (refuse to run without `CI_REPRO_YES=1`). Not changed in this branch.
+The fail-closed change (require `CI_REPRO_YES=1` when there is no TTY) was proposed and **the
+maintainer chose to keep the current behavior**. It is unchanged in this branch. Revisit it if the
+threat model changes.
