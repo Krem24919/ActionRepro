@@ -1,3 +1,4 @@
+import { tokenAllowedFor } from "./url.js";
 import { spawnSync } from "node:child_process";
 
 export interface GitHubRun {
@@ -40,12 +41,23 @@ const API_BASE = "https://api.github.com";
  */
 export const HTTP_TIMEOUT_MS = 60_000;
 
-export function authHeaders(token?: string): Record<string, string> {
+/**
+ * Request headers for a GitHub API call. When `url` is given, no token is ever sent to a host
+ * that tokenAllowedFor() rejects (so a crafted URL cannot receive GITHUB_TOKEN from the
+ * environment). Without `url` the caller is responsible for the host.
+ */
+export function authHeaders(token?: string, url?: string): Record<string, string> {
   const h: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "User-Agent": "actionrepro",
     "X-GitHub-Api-Version": "2022-11-28",
   };
+  if (url !== undefined) {
+    const host = new URL(url).host.toLowerCase();
+    // The REST API host of github.com is api.github.com; it is the same trust domain.
+    const webHost = host === "api.github.com" ? "github.com" : host;
+    if (!tokenAllowedFor(webHost)) return h;
+  }
   const t = (token ?? process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN ?? "").trim();
   if (t) h.Authorization = `Bearer ${t}`;
   return h;
@@ -96,12 +108,13 @@ export function resolveToken(explicit?: string): string | undefined {
 
 async function getJson(url: string, token?: string): Promise<any> {
   const res = await fetch(url, {
-    headers: authHeaders(token),
+    headers: authHeaders(token, url),
     signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
   });
   if (res.status === 404) {
     throw new Error(
-      `GitHub API 404 for ${url}. Check owner/repo/run id. For private repos set GITHUB_TOKEN.`,
+      `GitHub API 404 for ${url}. Check owner/repo/run id. For private repos set GITHUB_TOKEN ` +
+        `(on GitHub Enterprise also set GH_HOST to the host name).`,
     );
   }
   if (res.status === 401 || res.status === 403) {
@@ -121,7 +134,7 @@ async function getJson(url: string, token?: string): Promise<any> {
 
 async function getText(url: string, token?: string): Promise<string> {
   const res = await fetch(url, {
-    headers: authHeaders(token),
+    headers: authHeaders(token, url),
     signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
   });
   if (!res.ok) {
@@ -172,21 +185,26 @@ export async function fetchRun(
   repo: string,
   runId: string,
   token?: string,
+  apiBase: string = API_BASE,
 ): Promise<GitHubRun> {
-  return getJson(`${API_BASE}/repos/${owner}/${repo}/actions/runs/${runId}`, token);
+  return getJson(`${apiBase}/repos/${owner}/${repo}/actions/runs/${runId}`, token);
 }
+
+/** Upper bound on job-list pages (100 jobs each). The API's total_count normally stops the loop earlier. */
+export const MAX_JOB_PAGES = 100;
 
 export async function fetchJobs(
   owner: string,
   repo: string,
   runId: string,
   token?: string,
+  apiBase: string = API_BASE,
 ): Promise<GitHubJob[]> {
   const jobs: GitHubJob[] = [];
   let page = 1;
   for (;;) {
     const data = await getJson(
-      `${API_BASE}/repos/${owner}/${repo}/actions/runs/${runId}/jobs?per_page=100&page=${page}`,
+      `${apiBase}/repos/${owner}/${repo}/actions/runs/${runId}/jobs?per_page=100&page=${page}`,
       token,
     );
     const batch: GitHubJob[] = data.jobs ?? [];
@@ -194,7 +212,8 @@ export async function fetchJobs(
     const total: number = data.total_count ?? jobs.length;
     if (jobs.length >= total || batch.length === 0) break;
     page += 1;
-    if (page > 10) break;
+    // Safety valve only: 100 pages x 100 jobs. The run's own total_count ends the loop normally.
+    if (page > MAX_JOB_PAGES) break;
   }
   return jobs;
 }
@@ -205,8 +224,9 @@ export async function fetchJobLogs(
   repo: string,
   jobId: number | string,
   token?: string,
+  apiBase: string = API_BASE,
 ): Promise<string> {
-  return getText(`${API_BASE}/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, token);
+  return getText(`${apiBase}/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, token);
 }
 
 export interface WorkflowFile {
@@ -226,17 +246,26 @@ export async function fetchWorkflowFile(
   runId: string,
   headSha: string,
   token?: string,
+  apiBase: string = API_BASE,
 ): Promise<WorkflowFile | null> {
   try {
     const run = (await getJson(
-      `${API_BASE}/repos/${owner}/${repo}/actions/runs/${runId}`,
+      `${apiBase}/repos/${owner}/${repo}/actions/runs/${runId}`,
       token,
-    )) as { workflow_url?: string };
-    if (!run.workflow_url) return null;
-    const workflow = (await getJson(run.workflow_url, token)) as { path?: string };
+    )) as { workflow_id?: number | string };
+    // Build the workflow URL from the id on the same API base, instead of following the
+    // response's workflow_url: every request then stays on the host the run came from.
+    if (run.workflow_id === undefined || run.workflow_id === null) return null;
+    const workflowId = encodeURIComponent(String(run.workflow_id));
+    const workflow = (await getJson(
+      `${apiBase}/repos/${owner}/${repo}/actions/workflows/${workflowId}`,
+      token,
+    )) as { path?: string };
     if (!workflow.path) return null;
+    // Encode each path segment (names may contain spaces, #, ? ...) and the ref.
+    const encodedPath = workflow.path.split("/").map(encodeURIComponent).join("/");
     const file = (await getJson(
-      `${API_BASE}/repos/${owner}/${repo}/contents/${workflow.path}?ref=${headSha}`,
+      `${apiBase}/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(headSha)}`,
       token,
     )) as { content?: string; sha?: string; type?: string };
     if (file.type && file.type !== "file") return null;
@@ -261,14 +290,15 @@ export async function fetchRunBundle(
   repo: string,
   runId: string,
   token?: string,
+  apiBase: string = API_BASE,
 ): Promise<RunBundle> {
-  const run = await fetchRun(owner, repo, runId, token);
-  const jobs = await fetchJobs(owner, repo, runId, token);
+  const run = await fetchRun(owner, repo, runId, token, apiBase);
+  const jobs = await fetchJobs(owner, repo, runId, token, apiBase);
   const logsByJob = new Map<string, string>();
   const parts: string[] = [];
   for (const job of jobs) {
     try {
-      const logs = await fetchJobLogs(owner, repo, job.id, token);
+      const logs = await fetchJobLogs(owner, repo, job.id, token, apiBase);
       logsByJob.set(String(job.id), logs);
       parts.push(
         `\n===== JOB: ${job.name} (id=${job.id}, conclusion=${job.conclusion}) =====\n${logs}`,

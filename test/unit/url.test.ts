@@ -8,6 +8,8 @@ describe("parseGitHubRunUrl", () => {
         owner: "OWNER",
         repo: "REPO",
         runId: "12345",
+        host: "github.com",
+        apiBase: "https://api.github.com",
       },
     );
   });

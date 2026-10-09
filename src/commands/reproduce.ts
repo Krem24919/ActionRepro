@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { parseGitHubRunUrl } from "../core/url.js";
+import { parseGitHubRunUrl, tokenAllowedFor } from "../core/url.js";
 import { findProvider, resolveProviderToken } from "../providers/registry.js";
 import { loadLogsFromFile } from "../core/logs.js";
 import { redactText } from "../core/redact.js";
@@ -123,7 +123,8 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
       ghParsed.repo,
       ghParsed.runId,
       fetched.run.headSha,
-      token,
+      tokenAllowedFor(ghParsed.host) ? token : undefined,
+      ghParsed.apiBase,
     );
     if (wf) {
       const step = extractStepScript(wf.text, failingStep, failingJob);
