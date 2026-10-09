@@ -299,6 +299,10 @@ if ($env:CI_REPRO_YES -ne "1" -and -not [Console]::IsInputRedirected) {
 }
 Write-Host ""
 Write-Host "==> [actionrepro] Step 1/2: install dependencies"
+# Some install blocks run no native command (unknown ecosystem, skipped npm
+# install). LASTEXITCODE is null then, and null -ne 0 is TRUE in PowerShell,
+# so seed success explicitly; a failing native command below overwrites it.
+$LASTEXITCODE = 0
 ${installPs}
 if ($LASTEXITCODE -ne 0) {
   Write-Host "==> [actionrepro] INSTALL_FAILED: dependency setup exited with code $LASTEXITCODE."

@@ -128,6 +128,16 @@ describe("PowerShell script", () => {
     expect(ps1).not.toContain("##[error]");
     expect(ps1).toContain("## [error]");
   });
+
+  it("seeds $LASTEXITCODE before the install block ($null -ne 0 is true)", () => {
+    // Install blocks without a native command (unknown ecosystem, skipped
+    // npm install) leave $LASTEXITCODE at $null; without the seed the
+    // INSTALL_FAILED branch below would trigger with an empty code.
+    const ps1 = buildReproducePs1(inputFor("npm test"));
+    const seed = ps1.indexOf("$LASTEXITCODE = 0");
+    expect(seed).toBeGreaterThan(-1);
+    expect(seed).toBeLessThan(ps1.indexOf("INSTALL_FAILED"));
+  });
 });
 
 describe("shDq / psDq", () => {
