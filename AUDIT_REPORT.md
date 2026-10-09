@@ -10,38 +10,38 @@ from the current `dist/`.
 
 ## 1. Results at a glance
 
-| Check                                       | Baseline `ec66a64`                 | This branch                                                                      |
-| ------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------- |
-| `npm run typecheck`                         | pass                               | pass                                                                             |
-| `npm run lint` (`--max-warnings 0`)         | pass                               | pass                                                                             |
-| `npm run format`                            | pass                               | pass                                                                             |
-| `npm run build`                             | pass (TS6133 seen mid-work, fixed) | pass, clean                                                                      |
-| `npm test`                                  | 182 / 182 (26 files)               | **267 / 267 (32 files)**                                                         |
-| Touched test files run against baseline src | —                                  | **42 tests fail on baseline** (new tests plus one updated existing test); see §4 |
-| `npm run bench`                             | PASS 9/9 (measured)                | PASS 9/9                                                                         |
-| `npm run smoke`                             | —                                  | all steps pass except `doctor`'s network check (see §5, environment)             |
+| Check                                       | Baseline `ec66a64`                 | This branch                                                                                            |
+| ------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `npm run typecheck`                         | pass                               | pass                                                                                                   |
+| `npm run lint` (`--max-warnings 0`)         | pass                               | pass                                                                                                   |
+| `npm run format`                            | pass                               | pass                                                                                                   |
+| `npm run build`                             | pass (TS6133 seen mid-work, fixed) | pass, clean                                                                                            |
+| `npm test`                                  | 182 / 182 (26 files)               | **267 / 267 (32 files)**                                                                               |
+| Touched test files run against baseline src | —                                  | **48 of 152 fail on baseline** (44 fail, plus 4 `selection` tests whose module does not exist); see §4 |
+| `npm run bench`                             | PASS 9/9 (measured)                | PASS 9/9                                                                                               |
+| `npm run smoke`                             | —                                  | all steps pass except `doctor`'s network check (see §5, environment)                                   |
 
-Diff size: 30 tracked files changed, +664 / −292 lines, plus 1 new source file (`src/core/selection.ts`), 6 new test files, and this report.
+Diff size (`git diff --shortstat ec66a64 HEAD`): 39 files changed, +1577 / −292 lines. That is 31 existing files modified and 8 new files: 1 source file (`src/core/selection.ts`), 6 test files, and this report.
 
 ## 2. Measured behavior changes (same inputs, baseline vs. branch)
 
-| #   | Scenario                                                                                                   | Baseline                                                                          | This branch                                                       |
-| --- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| M1  | `bash -n` on the generated `reproduce.sh` for a pip log                                                    | exit 2 (syntax error at line 44)                                                  | exit 0                                                            |
-| M2  | `prove <bundle> silent.log` where the fresh log is `Process completed with exit code 7.` and nothing else  | exit **0**, `state: fixed`                                                        | exit **2**, `state: inconclusive`                                 |
-| M3  | `prove <bundle> --run` where dependency setup fails (`python3` returns 3)                                  | exit **0**, `state: fixed`                                                        | exit **2**, `state: unable-to-reproduce`                          |
-| M4  | `reproduce <log> --run` where the CI command is `node -e "process.exit(5)"` (GitHub `##[group]Run` header) | exit 0, repro command `# see failure.txt …` (nothing runs)                        | exit **5**, repro command `node -e "process.exit(5)"`             |
-| M5  | Jest log with a `+ Received` diff line under `##[group]Run npx jest`                                       | repro command = `Received` (would be executed)                                    | repro command = `npx jest`                                        |
-| M6  | `TypeError: cannot read properties of undefined` in a CI log                                               | summary `Failure: ##[error]Process completed with exit code 1.`                   | summary `Failure: TypeError: cannot read properties of undefined` |
-| M7  | `verify <bundle> silent.log --json` (INCONCLUSIVE verdict)                                                 | exit **0**                                                                        | exit **2**                                                        |
-| M8  | `verify <bundle> ok.log --json` (NOT_REPRODUCED verdict)                                                   | exit **0**                                                                        | exit **1** (same as text mode)                                    |
-| M9  | `redactText("Basic authentication failed for registry")`                                                   | `Basic [REDACTED] failed for registry`                                            | unchanged                                                         |
-| M10 | `redactText("Bearer authentication required")`                                                             | `Bearer [REDACTED] required`                                                      | unchanged                                                         |
-| M11 | `prove --run` temp directories left behind per run (captured, unredacted CI output)                        | 1 per run                                                                         | 0                                                                 |
-| M12 | GitLab pipeline with 230 jobs                                                                              | one request `jobs?per_page=100`, no `page` parameter, so jobs 101+ are never seen | paginated, up to 10 pages of 100                                  |
+| #   | Scenario                                                                                                   | Baseline                                                                          | This branch                                                                           |
+| --- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| M1  | `bash -n` on the generated `reproduce.sh` for a pip log                                                    | exit 2 (syntax error at line 44)                                                  | exit 0                                                                                |
+| M2  | `prove <bundle> silent.log` where the fresh log is `Process completed with exit code 7.` and nothing else  | exit **0**, `state: fixed`                                                        | exit **2**, `state: inconclusive`                                                     |
+| M3  | `prove <bundle> --run` where dependency setup fails (`python3` returns 3)                                  | exit **0**, `state: fixed`                                                        | exit **2**, `state: unable-to-reproduce`                                              |
+| M4  | `reproduce <log> --run` where the CI command is `node -e "process.exit(5)"` (GitHub `##[group]Run` header) | exit 0, repro command `# see failure.txt …` (nothing runs)                        | exit **5**, repro command `node -e "process.exit(5)"`                                 |
+| M5  | Jest log with a `+ Received` diff line under `##[group]Run npx jest`                                       | repro command = `Received` (would be executed)                                    | repro command = `npx jest`                                                            |
+| M6  | `TypeError: cannot read properties of undefined` in a CI log                                               | summary `Failure: ##[error]Process completed with exit code 1.`                   | summary `Failure: TypeError: cannot read properties of undefined`                     |
+| M7  | `verify <bundle> silent.log --json` (INCONCLUSIVE verdict)                                                 | exit **0**                                                                        | exit **2**                                                                            |
+| M8  | `verify <bundle> ok.log --json` (NOT_REPRODUCED verdict)                                                   | exit **0**                                                                        | exit **1** (same as text mode)                                                        |
+| M9  | `redactText("Basic authentication failed for registry")`                                                   | `Basic [REDACTED] failed for registry`                                            | unchanged                                                                             |
+| M10 | `redactText("Bearer authentication required")`                                                             | `Bearer [REDACTED] required`                                                      | unchanged                                                                             |
+| M11 | `prove --run` temp directories left behind per run (captured, unredacted CI output)                        | 1 per run                                                                         | 0                                                                                     |
+| M12 | GitLab pipeline with 230 jobs                                                                              | one request `jobs?per_page=100`, no `page` parameter, so jobs 101+ are never seen | paginated, up to 10 pages of 100. Measured: 100 of 230 jobs → 230 of 230 (3 requests) |
 
-Earlier probe (this session, before the MCP change): `reproduce --run` through MCP wrote
-13 of 16 stdout lines that were not JSON-RPC. After the change, child output goes to a
+Re-measured on the baseline build (MCP `reproduce` with `run:true` on a failing exit-5 log): 13 of 15
+stdout lines were not JSON-RPC (the branch: 0 of 2). After the change, child output goes to a
 temp file and only a redacted tail is returned (`runOutputTail`). The MCP test now checks
 that nothing else reaches `process.stdout`.
 
@@ -126,7 +126,7 @@ that nothing else reaches `process.stdout`.
 
 ### MCP server
 
-17. **`reproduce` with `run:true` wrote unrelated child output to stdout** (M-probe: 13 of 16 lines
+17. **`reproduce` with `run:true` wrote unrelated child output to stdout** (re-measured: 13 of 15 lines
     were not JSON-RPC). _Fix:_ output is captured to a temp file, a redacted tail is returned, and the
     temp directory is removed. _Test:_ `mcp-tools.test.ts` checks that nothing else reaches `process.stdout`.
 
@@ -162,7 +162,10 @@ that nothing else reaches `process.stdout`.
   as is (see §6).
 - **`reproduce --run` and MCP `run:true` run the bundle's install step in the current directory.**
   For npm repos that is `npm ci`, which deletes `node_modules` first. This caused the incident in §5.
-  Consider requiring an explicit `--cwd` for `--run`.
+  Measured on this branch: `node dist/cli.js reproduce ./e5.log --out ./bundle --run` run from a project
+  directory with `package-lock.json` and `node_modules/sentinel` deleted `node_modules` (exit 5 from the
+  CI command). Not changed: this is default behavior, not a regression. Consider requiring an explicit
+  `--cwd` for `--run`.
 - `action.yml`: `OUT_DIR` is interpolated into a `node -e` string (command-injection risk). Not verified or changed.
 - `runner.ts`: `spawnSync` has no timeout, so a hung repro hangs the CLI. Not changed.
 - `github.ts`: `fetchJobs` stops after 10 pages (1000 jobs). `fetchWorkflowFile` does not URL-encode the path.
@@ -192,7 +195,9 @@ that nothing else reaches `process.stdout`.
 - `test/integration/exit-codes.test.ts` (12): fixtures produce valid bash; install failure → 3; no command → 5; command's own exit 5 propagates; prove mapping (install-fail, no-command, command-exit-5, relative path); temp-dir cleanup; verify exit codes with and without `--json`.
 - `test/integration/prove.test.ts`: updated for the new `runOutputTail` contract (the captured log is removed).
 
-Run against the baseline source, 42 tests in the touched files fail (out of 119 in those files). Some
+Run against the baseline source (the 12 touched test files, copied over the baseline `src/`), 44 of
+the 148 tests that load fail. `test/unit/selection.test.ts` cannot load at all because `src/core/selection.ts`
+does not exist there, so its 4 tests also fail. The branch passes all 152 tests in these files. Some
 fail only because the function or export does not exist yet (for example `scriptNotRunReason`,
 `HTTP_TIMEOUT_MS`), so they show "missing", not "wrong behavior". The behavior-level evidence is the
 M-table in §2.
@@ -202,6 +207,10 @@ M-table in §2.
 While running the MCP `reproduce --run` test, the bundle ran `npm ci` in the repository root
 (`process.cwd()`), which deleted `node_modules` and failed. The test now runs from a temp directory
 (`process.chdir`), and `npm ci` restored `node_modules` from `package-lock.json` (121 top-level entries).
+The mechanism was reproduced in isolation: `npm ci` in a directory with a lockfile removed a
+`node_modules/sentinel` package (exit 0), and `npm install` with no lockfile also removed it (exit 0),
+because npm prunes extraneous packages. The same `reproduce --run` run from a project directory is
+shown above in §3 (Known issues).
 No tracked file was affected (`git status` shows only intended changes). The baseline comparison copy
 in `/tmp/base` hit the same issue and was rebuilt from scratch.
 
