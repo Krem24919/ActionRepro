@@ -14,19 +14,48 @@ export interface RuntimeInfo {
   runnerName?: string;
 }
 
+/**
+ * Operating system from the runner's setup banner. Real GitHub logs put the name on its own line
+ * with the version on the following indented lines ("Operating System" / "  Ubuntu" / "  22.04.4" /
+ * "  LTS"), so the value is joined across those lines.
+ */
+export function operatingSystem(joined: string): string | undefined {
+  const lines = joined.split("\n");
+  const idx = lines.findIndex((l) => /^\s*Operating System\s*$/.test(l));
+  if (idx >= 0) {
+    // Continuation lines: at most three short lines, stopping at a blank line or the next section.
+    const parts: string[] = [];
+    for (let i = idx + 1; i < lines.length && parts.length < 3; i++) {
+      const t = lines[i].trim();
+      if (t === "" || t.includes(":") || NEXT_SECTION_RE.test(t)) break;
+      parts.push(t);
+    }
+    if (parts.length > 0) return parts.join(" ");
+  }
+  const inline = joined.match(/^[ \t]*Operating System:?[ \t]+(\S[^\n]*)$/m);
+  if (inline) return inline[1].trim();
+  const running = joined.match(/Running on (Ubuntu|Windows|macOS)([^\n]*)/i);
+  if (running) return `${running[1]}${running[2]}`.trim();
+  return undefined;
+}
+
+const NEXT_SECTION_RE =
+  /^(Runner Image|Runner Name|Runner name|Runner Group|Machine name|Current runner|Hosted Compute|Included Software|Image Release)\b/i;
+
 export function detectRuntime(logLines: string[]): RuntimeInfo {
   const lines = normalizedLines(logLines);
   const joined = lines.join("\n");
   const info: RuntimeInfo = {};
 
-  const osMatch =
-    joined.match(/Running on (Ubuntu|Windows|macOS)([^\n]*)/i) ??
-    joined.match(/Current runner version:[^\n]*\n[^\n]*Operating System:\s*([^\n]+)/i) ??
-    joined.match(/Operating System:\s*([^\n]+)/i);
-  if (osMatch) info.os = osMatch[1]?.trim() ?? osMatch[0].trim();
+  const os = operatingSystem(joined);
+  if (os) info.os = os;
 
-  const arch = joined.match(/\b(x64|x86_64|arm64|aarch64)\b/);
-  if (arch) info.arch = arch[1];
+  // Only labelled architecture lines describe the runner. A bare "x86_64" usually comes from a
+  // build flag (for example `--target x86_64-unknown-linux-gnu`), which is not the runner.
+  const arch = joined.match(
+    /\b(?:architecture|arch|platform)\b[^\n]{0,20}?\b(x64|x86_64|amd64|arm64|aarch64)\b/i,
+  );
+  if (arch) info.arch = arch[1].toLowerCase() === "amd64" ? "x64" : arch[1].toLowerCase();
 
   const node =
     joined.match(/Node(?:\.js)? (?:version )?v?(\d+\.\d+\.\d+)/i) ??
