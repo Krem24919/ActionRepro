@@ -15,7 +15,6 @@ core/             provider-agnostic logic: url, github, logs, redact, extract,
                   history
 providers/        CiProvider implementations (github-actions, gitlab)
                   + registry (findProvider / resolveProviderToken)
-ecosystems/       EcosystemAdapter registry (11 ecosystems)
 mcp/              dependency-free MCP stdio server reusing command functions
 utils/            fs, log, version
 ```
@@ -60,8 +59,10 @@ Local-file mode skips fetching; everything downstream is identical.
   keyed by fingerprint, tolerant of corrupt lines. History never breaks the
   command that consults it.
 - **Redaction is best-effort**, applied to every log line, summary, file,
-  and error message. Tokens go only to `api.github.com` (GitHub) or the
-  GitLab host, and never appear in outputs — enforced by tests with
+  and error message. Tokens go only to `api.github.com` (github.com runs),
+  a GitHub Enterprise host named in `GH_HOST`, or the GitLab host (see
+  `tokenAllowedFor` in `core/url.ts`; `authHeaders` enforces it per request),
+  and never appear in outputs — enforced by tests with
   sentinel tokens.
 - **Generated scripts are untrusted-input runners**: confirm gate on TTYs,
   `CI_REPRO_YES=1` to skip, single evaluation pass (no `Invoke-Expression`),

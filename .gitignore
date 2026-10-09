@@ -8,3 +8,4 @@ actionrepro/
 !fixtures/logs/*.log
 !.gitignore
 .trashed-*
+!fixtures/ecosystems/*.log

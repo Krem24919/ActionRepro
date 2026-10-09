@@ -128,9 +128,25 @@ actionrepro doctor --json
 Private repos and higher rate limits:
 
 ```bash
-export GITHUB_TOKEN=ghp_...   # never printed; only sent to api.github.com
+export GITHUB_TOKEN=ghp_...   # never printed; only sent to github.com (api.github.com)
 actionrepro https://github.com/ORG/PRIVATE/actions/runs/ID
 ```
+
+GitHub Enterprise Server works with the same commands. The token is sent to an Enterprise
+host only when you name that host in `GH_HOST`; otherwise only public runs can be read there:
+
+```bash
+export GH_HOST=ghe.example.com   # the token is sent to this host only
+export GITHUB_TOKEN=ghp_...
+actionrepro https://ghe.example.com/ORG/REPO/actions/runs/ID
+```
+
+Running a bundle (`reproduce --run` or `prove --run`):
+
+- An existing `node_modules` in the directory the script runs from is kept: the install step is
+  skipped. `npm ci` would delete it first. Set `ACTIONREPRO_REINSTALL=1` to reinstall anyway.
+- The script stops after 30 minutes by default (exit `124`). Set `ACTIONREPRO_TIMEOUT_MS` to change
+  the limit in milliseconds, or `0` to disable it.
 
 No token handy but have the GitHub CLI? If `gh` is installed and authenticated,
 its token is used automatically — no flags needed:
@@ -170,15 +186,15 @@ Authentication notes (verified against the live GitHub API):
 
 ## What the bundle contains
 
-| File              | Purpose                                                           |
-| ----------------- | ----------------------------------------------------------------- |
-| `reproduce.sh`    | Bash repro script (Linux/macOS/Termux/Git Bash), `chmod +x` ready |
-| `reproduce.ps1`   | PowerShell repro script for Windows                               |
-| `README.md`       | Human summary: source, failure, env, how to run                   |
-| `failure.txt`     | Redacted failure excerpt + error context                          |
-| `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint             |
-| `repro.json`      | Machine-readable redacted metadata                                |
-| `bundle.sha256`   | Integrity hash over the bundle content files                      |
+| File              | Purpose                                                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `reproduce.sh`    | Bash repro script (Linux/macOS/Termux/Git Bash), `chmod +x` ready                                                |
+| `reproduce.ps1`   | PowerShell repro script for Windows                                                                              |
+| `README.md`       | Human summary: source, failure, env, how to run                                                                  |
+| `failure.txt`     | Redacted failure excerpt + error context                                                                         |
+| `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint                                                            |
+| `repro.json`      | Machine-readable redacted metadata, including `generatedAt` (ISO time the bundle was written) and `bundleSha256` |
+| `bundle.sha256`   | Integrity hash over the bundle content files                                                                     |
 
 Each bundle also records a **failure fingerprint** (stable hash of ecosystem,
 command, exit code, error kind, and the failure anchor line — the single most
@@ -391,7 +407,6 @@ src/
   mcp/                   # protocol.ts tools.ts server.ts (MCP stdio server, zero deps)
   core/                  # url.ts github.ts logs.ts redact.ts extract.ts ecosystems.ts runtime.ts bundle.ts runner.ts fingerprint.ts workflow.ts history.ts
   providers/             # types.ts (CiProvider) + github-actions.ts gitlab.ts registry.ts
-  ecosystems/            # adapters.ts + registry.ts + types.ts (per-ecosystem behavior)
   utils/                 # fs.ts log.ts version.ts
 test/unit/ test/integration/   # vitest, deterministic fixtures
 fixtures/logs/ fixtures/api/
@@ -445,7 +460,7 @@ caches, artifacts, secrets, or matrix variables. Use `verify` as evidence
 (REPRODUCED / NOT_REPRODUCED), not proof.
 
 **Windows?**
-Use `reproduce.ps1`. The generated scripts ask for confirmation on
+Use `reproduce.ps1`. It is checked by content and exit-code tests only: it has not been run on Windows in CI, so treat it as untested there. The generated scripts ask for confirmation on
 interactive terminals; set `CI_REPRO_YES=1` to skip it in automation.
 
 **How is this different from `act`?**
