@@ -23,6 +23,13 @@ afterAll(() => {
   fs.rmSync(work, { recursive: true, force: true });
 });
 
+/** Canonical path: the CLI reports process.cwd(), which the OS resolves
+ * physically (on macOS, /var/folders/... becomes /private/var/folders/...),
+ * while the test's mkdtemp paths keep the logical form. */
+function canonical(p: string): string {
+  return fs.realpathSync(p);
+}
+
 interface StepRun {
   status: number | null;
   stdout: string;
@@ -82,7 +89,7 @@ describe("action.yml repro step (end-to-end)", () => {
     expect(r.status, r.stderr).toBe(0);
     expect(fs.existsSync(path.join(cwd, "bundle", "reproduce.sh"))).toBe(true);
     // The CLI reports the absolute bundle path.
-    expect(r.outputs["out-dir"]).toBe(path.join(cwd, "bundle"));
+    expect(r.outputs["out-dir"]).toBe(canonical(path.join(cwd, "bundle")));
     expect(r.outputs["summary"].length).toBeGreaterThan(0);
     expect(r.outputs["repro-command"].length).toBeGreaterThan(0);
   });
@@ -130,7 +137,7 @@ describe("action.yml repro step (end-to-end)", () => {
     const cwd = fs.mkdtempSync(path.join(work, "run-"));
     const r = runStep({ ACTIONREPRO_LOG: LOG, ACTIONREPRO_OUT: "Bob's dir" }, cwd);
     expect(r.status, r.stderr).toBe(0);
-    expect(r.outputs["out-dir"]).toBe(path.join(cwd, "Bob's dir"));
+    expect(r.outputs["out-dir"]).toBe(canonical(path.join(cwd, "Bob's dir")));
     expect(fs.existsSync(path.join(cwd, "Bob's dir", "reproduce.sh"))).toBe(true);
   });
 
@@ -139,7 +146,7 @@ describe("action.yml repro step (end-to-end)", () => {
     const payload = "inj$(touch pwned-by-out)";
     const r = runStep({ ACTIONREPRO_LOG: LOG, ACTIONREPRO_OUT: payload }, cwd);
     expect(fs.existsSync(path.join(cwd, "pwned-by-out"))).toBe(false);
-    expect(r.outputs["out-dir"]).toBe(path.join(cwd, payload));
+    expect(r.outputs["out-dir"]).toBe(canonical(path.join(cwd, payload)));
   });
 
   it("ACTIONREPRO_RUN=false never executes the generated script", () => {
