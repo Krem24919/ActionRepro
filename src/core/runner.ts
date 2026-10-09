@@ -55,7 +55,9 @@ export function runReproduceScript(outDir: string, opts: RunOptions = {}): numbe
     if (isWin) {
       const r = spawnSync("powershell", ["-ExecutionPolicy", "Bypass", "-File", script], {
         stdio,
-        cwd: opts.cwd ?? dir,
+        // Same default as POSIX below: the caller's directory (the repo under
+        // test), so the install block sees the project's node_modules.
+        cwd: opts.cwd ?? process.cwd(),
         timeout: spawnTimeout,
       });
       if (r.error && (r.error as NodeJS.ErrnoException).code !== "ETIMEDOUT")

@@ -15,9 +15,21 @@ afterEach(() => {
 });
 
 function bundleWith(sh: string): string {
+  return bundleWithScripts(sh, toPs(sh));
+}
+
+/** PowerShell twin of the bourne body used by these tests. */
+function toPs(sh: string): string {
+  if (sh === "sleep 30") return "Start-Sleep -Seconds 30";
+  if (sh === "echo fine; exit 7") return 'Write-Output "fine"; exit 7';
+  return sh;
+}
+
+function bundleWithScripts(sh: string, ps: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-timeout-"));
   dirs.push(dir);
   fs.writeFileSync(path.join(dir, "reproduce.sh"), `#!/bin/sh\n${sh}\n`);
+  fs.writeFileSync(path.join(dir, "reproduce.ps1"), `${ps}\n`);
   return dir;
 }
 
