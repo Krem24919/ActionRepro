@@ -1,5 +1,5 @@
 import { fetchRunBundle } from "../core/github.js";
-import { parseGitHubRunUrl } from "../core/url.js";
+import { parseGitHubRunUrl, tokenAllowedFor } from "../core/url.js";
 import type { CiFetchResult, CiProvider } from "./types.js";
 
 export class GitHubActionsProvider implements CiProvider {
@@ -12,11 +12,14 @@ export class GitHubActionsProvider implements CiProvider {
   async fetch(input: string, opts: { token?: string }): Promise<CiFetchResult> {
     const parsed = parseGitHubRunUrl(input.trim());
     if (!parsed) throw new Error(`Not a GitHub Actions run URL: ${input}`);
+    // The token only goes to github.com or to a host named in GH_HOST (see tokenAllowedFor).
+    const token = tokenAllowedFor(parsed.host) ? opts.token : undefined;
     const bundle = await fetchRunBundle(
       parsed.owner,
       parsed.repo,
       parsed.runId,
-      opts.token,
+      token,
+      parsed.apiBase,
     );
     return {
       run: {
@@ -47,17 +50,4 @@ export class GitHubActionsProvider implements CiProvider {
       combinedLogs: bundle.combinedLogs,
     };
   }
-}
-
-export function failingJobName(result: CiFetchResult): string | undefined {
-  const j = result.jobs.find((x) => x.conclusion === "failure");
-  return j?.name;
-}
-
-export function failingStepName(result: CiFetchResult): string | undefined {
-  for (const j of result.jobs) {
-    const s = j.steps?.find((x) => x.conclusion === "failure");
-    if (s) return s.name;
-  }
-  return undefined;
 }

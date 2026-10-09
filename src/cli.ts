@@ -79,6 +79,9 @@ program
           console.log(`  redactions: ${res.redactions}`);
           if (opts.run) console.log(`  reproduce exit code: ${res.exitCode ?? "?"}`);
         }
+        // With --run the bundle's exit code is the command's exit code (see
+        // ARCHITECTURE.md "Exit codes are a contract"); CI can gate on it.
+        if (opts.run && res.exitCode !== undefined) process.exitCode = res.exitCode;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));
@@ -110,11 +113,10 @@ program
     try {
       const r = await verifyBundle({ bundleDir: bundle, logFile: logfile });
       if (opts.json) console.log(JSON.stringify({ ok: true, ...r }, null, 2));
-      else {
-        console.log(sanitizeActionsOutput(formatVerifyHuman(r)));
-        process.exitCode =
-          r.verdict === "REPRODUCED" ? 0 : r.verdict === "NOT_REPRODUCED" ? 1 : 2;
-      }
+      else console.log(sanitizeActionsOutput(formatVerifyHuman(r)));
+      // Same exit contract for humans and machines: --json must not change CI gating.
+      process.exitCode =
+        r.verdict === "REPRODUCED" ? 0 : r.verdict === "NOT_REPRODUCED" ? 1 : 2;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));
@@ -144,22 +146,26 @@ program
       logfile: string | undefined,
       opts: { run: boolean; cwd?: string; historyFile?: string; json: boolean },
     ) => {
-      const r = await proveFix({
-        bundleDir: bundle,
-        logFile: logfile,
-        run: opts.run,
-        runCwd: opts.cwd,
-        historyFile: opts.historyFile,
-      });
-      if (opts.json) console.log(JSON.stringify({ ok: true, ...r }, null, 2));
-      else {
-        console.log(sanitizeActionsOutput(formatProveHuman(r)));
+      try {
+        const r = await proveFix({
+          bundleDir: bundle,
+          logFile: logfile,
+          run: opts.run,
+          runCwd: opts.cwd,
+          historyFile: opts.historyFile,
+        });
+        if (opts.json) console.log(JSON.stringify({ ok: true, ...r }, null, 2));
+        else console.log(sanitizeActionsOutput(formatProveHuman(r)));
         process.exitCode =
           r.state === "fixed"
             ? 0
             : r.state === "inconclusive" || r.state === "unable-to-reproduce"
               ? 2
               : 1;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));
+        process.exitCode = 1;
       }
     },
   );
@@ -281,6 +287,7 @@ async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
           ),
         );
     }
+    if (parsed.run && res.exitCode !== undefined) process.exitCode = res.exitCode;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(sanitizeActionsOutput(`error: ${redactText(msg).text}`));

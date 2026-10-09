@@ -15,7 +15,6 @@ core/             provider-agnostic logic: url, github, logs, redact, extract,
                   history
 providers/        CiProvider implementations (github-actions, gitlab)
                   + registry (findProvider / resolveProviderToken)
-ecosystems/       EcosystemAdapter registry (11 ecosystems)
 mcp/              dependency-free MCP stdio server reusing command functions
 utils/            fs, log, version
 ```
@@ -43,10 +42,15 @@ Local-file mode skips fetching; everything downstream is identical.
   between CI and local runs by construction). `repro.json` records
   `fingerprintVersion`; cross-generation comparison is `INCONCLUSIVE`,
   never a wrong verdict.
-- **Exit codes are a contract**: reproduce `--run` and bundle scripts use
-  3 = setup failed, 4 = user aborted, else the command's own code.
-  `verify`: 0 REPRODUCED / 1 NOT_REPRODUCED / 2 INCONCLUSIVE.
-  `prove`: 0 fixed / 1 still-failing or changed-failure / 2 otherwise.
+- **Exit codes are a contract**: bundle scripts use 3 = setup failed,
+  4 = user aborted, 5 = no runnable command (nothing executed), else the
+  command's own code. `reproduce --run` returns the script's code.
+  `verify` (text and `--json` alike): 0 REPRODUCED / 1 NOT_REPRODUCED /
+  2 INCONCLUSIVE. `prove` (text and `--json` alike): 0 fixed /
+  1 still-failing or changed-failure / 2 inconclusive or unable-to-reproduce.
+  `prove --run` treats 3/4/5 as "not reproduced" only when the script's
+  `REPRODUCED:` / `NOT REPRODUCED:` line is absent, because the command itself
+  may exit with those codes.
 - **Log placeholder protocol**: undownloadable job logs are the string
   `(could not fetch logs for job <id>: <reason>)`, recognized by
   `allLogsFailed` / `firstLogError`. Providers must use it so callers fail
@@ -55,8 +59,10 @@ Local-file mode skips fetching; everything downstream is identical.
   keyed by fingerprint, tolerant of corrupt lines. History never breaks the
   command that consults it.
 - **Redaction is best-effort**, applied to every log line, summary, file,
-  and error message. Tokens go only to `api.github.com` (GitHub) or the
-  GitLab host, and never appear in outputs — enforced by tests with
+  and error message. Tokens go only to `api.github.com` (github.com runs),
+  a GitHub Enterprise host named in `GH_HOST`, or the GitLab host (see
+  `tokenAllowedFor` in `core/url.ts`; `authHeaders` enforces it per request),
+  and never appear in outputs — enforced by tests with
   sentinel tokens.
 - **Generated scripts are untrusted-input runners**: confirm gate on TTYs,
   `CI_REPRO_YES=1` to skip, single evaluation pass (no `Invoke-Expression`),

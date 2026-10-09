@@ -144,6 +144,11 @@ describe("commandsAgree", () => {
     expect(commandsAgree("npm test", "npm run build")).toBe(false);
   });
 
+  it("does not treat a longer word as an expansion (go test vs go testify)", () => {
+    expect(commandsAgree("go test", "go testify")).toBe(false);
+    expect(commandsAgree("npm test", "npm testing-tool")).toBe(false);
+  });
+
   it("returns null when either side is empty", () => {
     expect(commandsAgree("", "npm test")).toBeNull();
     expect(commandsAgree("npm test", "")).toBeNull();

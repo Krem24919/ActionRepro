@@ -1,4 +1,11 @@
 import type { CiFetchResult, CiJob, CiProvider, CiRun } from "./types.js";
+import { logFetchPlaceholder } from "../core/github.js";
+
+/** Same ceiling as the GitHub provider: a stalled connection must fail, not hang. */
+const HTTP_TIMEOUT_MS = 60_000;
+/** GitLab's maximum page size; also the pagination stop condition. */
+const PAGE_SIZE = 100;
+const MAX_PAGES = 10;
 
 export interface ParsedGitLabUrl {
   /** e.g. https://gitlab.com (self-hosted hosts work the same way). */
@@ -77,7 +84,10 @@ interface GitLabJob {
 async function getJson(url: string, token: string | undefined): Promise<unknown> {
   let res: Response;
   try {
-    res = await fetch(url, { headers: headers(token) });
+    res = await fetch(url, {
+      headers: headers(token),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+    });
   } catch (err) {
     throw new Error(
       `GitLab API unreachable at ${url}: ${err instanceof Error ? err.message : String(err)}`,
@@ -102,7 +112,10 @@ async function getJson(url: string, token: string | undefined): Promise<unknown>
 async function getTrace(url: string, token: string | undefined): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(url, { headers: { ...headers(token), Accept: "text/plain" } });
+    res = await fetch(url, {
+      headers: { ...headers(token), Accept: "text/plain" },
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+    });
   } catch (err) {
     throw new Error(
       `GitLab trace download failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -114,6 +127,28 @@ async function getTrace(url: string, token: string | undefined): Promise<string>
     );
   }
   return res.text();
+}
+
+/**
+ * All jobs of a pipeline. The API returns at most PAGE_SIZE per request, so a
+ * pipeline with more jobs would otherwise silently lose the later ones (and
+ * possibly the failing one).
+ */
+async function listPipelineJobs(
+  api: string,
+  pipelineId: number,
+  token: string | undefined,
+): Promise<GitLabJob[]> {
+  const all: GitLabJob[] = [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const batch = ((await getJson(
+      `${api}/pipelines/${pipelineId}/jobs?per_page=${PAGE_SIZE}&page=${page}`,
+      token,
+    )) ?? []) as GitLabJob[];
+    all.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return all;
 }
 
 export class GitLabProvider implements CiProvider {
@@ -142,10 +177,7 @@ export class GitLabProvider implements CiProvider {
       `${api}/pipelines/${pipelineIid}`,
       token,
     )) as GitLabPipeline;
-    const jobs = (await getJson(
-      `${api}/pipelines/${pipeline.id}/jobs?per_page=100`,
-      token,
-    )) as GitLabJob[];
+    const jobs = await listPipelineJobs(api, pipeline.id, token);
 
     const logsByJob = new Map<string, string>();
     const parts: string[] = [];
@@ -159,7 +191,7 @@ export class GitLabProvider implements CiProvider {
         // pipeline with no downloadable traces fails fast with a token hint
         // instead of producing a bundle from error text.
         const why = err instanceof Error ? err.message : String(err);
-        trace = `(could not fetch logs for job ${job.id}/${job.name}: ${why})`;
+        trace = logFetchPlaceholder(job.id, why);
       }
       logsByJob.set(String(job.id), trace);
       parts.push(`===== job: ${job.name} (status: ${job.status ?? "?"}) =====\n${trace}`);

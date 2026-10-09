@@ -148,7 +148,16 @@ export function diffEntries(a: HistoryEntry, b: HistoryEntry): string[] {
   return notes;
 }
 
-export function lookupHistory(file: string, fingerprint: string): HistoryLookup {
+/**
+ * Look up one fingerprint. Pass `currentAlgo` (the fingerprint algorithm in use) to get
+ * `legacyEntries`: when nothing matches, the number of entries written by another algorithm,
+ * so the caller can explain "never seen" instead of implying the failure is new.
+ */
+export function lookupHistory(
+  file: string,
+  fingerprint: string,
+  currentAlgo?: string,
+): HistoryLookup {
   const { entries } = readHistory(file);
   const mine = entries.filter((e) => e.fingerprint === fingerprint);
   const failures = mine.filter((e) => e.kind === "failure");
@@ -177,7 +186,10 @@ export function lookupHistory(file: string, fingerprint: string): HistoryLookup 
       firstFailure && lastFailure && firstFailure !== lastFailure
         ? diffEntries(firstFailure, lastFailure)
         : [],
-    legacyEntries: 0,
+    legacyEntries:
+      mine.length === 0 && currentAlgo !== undefined
+        ? entries.filter((e) => (e.fpv ?? "") !== currentAlgo).length
+        : 0,
     occurrences: mine,
   };
 }

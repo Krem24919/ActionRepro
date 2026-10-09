@@ -1,0 +1,4 @@
+2024-05-02T11:00:00.0000000Z ##[group]Run pytest -q
+2024-05-02T11:00:01.0000000Z FAILED tests/test_x.py::test_add - AssertionError
+2024-05-02T11:00:01.0000000Z Traceback (most recent call last):
+2024-05-02T11:00:03.0000000Z ##[error]Process completed with exit code 1.

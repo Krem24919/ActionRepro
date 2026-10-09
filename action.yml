@@ -72,16 +72,36 @@ runs:
           echo "actionrepro: provide the 'run-url' or 'log-file' input." >&2
           exit 2
         fi
-        node "${{ github.action_path }}/dist/cli.js" reproduce "$TARGET" --out "$ACTIONREPRO_OUT" --json > /tmp/actionrepro.json
-        # Extract redacted-only fields with node (no secrets echoed; the JSON itself is already redacted).
-        OUT_DIR=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/actionrepro.json','utf8')).outDir ?? '$ACTIONREPRO_OUT')")
-        SUMMARY=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/actionrepro.json','utf8')).summary ?? '')")
-        REPRO=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/actionrepro.json','utf8')).reproCommand ?? '')")
+        # Per-run temp file (RUNNER_TEMP is private to this job, unlike a fixed /tmp path).
+        JSON_FILE="$(mktemp "${RUNNER_TEMP:-/tmp}/actionrepro.XXXXXX.json")"
+        # Remove the JSON on every exit, including a failed reproduce under set -e (the later rm alone is skipped then).
+        trap 'rm -f "$JSON_FILE"' EXIT
+        node "${{ github.action_path }}/dist/cli.js" reproduce "$TARGET" --out "$ACTIONREPRO_OUT" --json > "$JSON_FILE"
+        # Values are passed through the environment, never spliced into the JavaScript source,
+        # so a quote in the input (for example an apostrophe in the out path) cannot break or inject code.
+        json_field() {
+          ACTIONREPRO_JSON="$JSON_FILE" ACTIONREPRO_DEFAULT="$2" node -e "
+            const j = JSON.parse(require('fs').readFileSync(process.env.ACTIONREPRO_JSON, 'utf8'));
+            const v = j[process.argv[1]];
+            process.stdout.write(String(v ?? process.env.ACTIONREPRO_DEFAULT ?? ''));
+          " "$1"
+        }
+        OUT_DIR="$(json_field outDir "$ACTIONREPRO_OUT")"
+        SUMMARY="$(json_field summary "")"
+        REPRO="$(json_field reproCommand "")"
+        # Multi-line-safe GITHUB_OUTPUT syntax: a newline in a value cannot inject extra outputs.
         {
-          echo "out-dir=$OUT_DIR"
-          echo "summary=$SUMMARY"
-          echo "repro-command=$REPRO"
+          for name in out-dir summary repro-command; do
+            case "$name" in
+              out-dir) value="$OUT_DIR" ;;
+              summary) value="$SUMMARY" ;;
+              repro-command) value="$REPRO" ;;
+            esac
+            delim="ACTIONREPRO_$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+            printf '%s<<%s\n%s\n%s\n' "$name" "$delim" "$value" "$delim"
+          done
         } >> "$GITHUB_OUTPUT"
+        rm -f "$JSON_FILE"
         echo "--- actionrepro summary (redacted) ---"
         # Neutralize workflow-command markers (e.g. ##[error] inside failure
         # text) so the runner never turns our output into phantom annotations.

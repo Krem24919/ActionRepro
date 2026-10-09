@@ -1,4 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {
   buildReproduceSh,
   buildReproducePs1,
@@ -152,5 +156,76 @@ describe("extraction preserves dangerous commands exactly", () => {
       "##[error]Process completed with exit code 1.",
     ]);
     expect(f.reproCommand).toBe(cmd);
+  });
+});
+
+/**
+ * Generated scripts must at least be valid bash. A syntax error here used to
+ * ship silently (the pip bundle failed `bash -n` at line 44 in CI's smoke).
+ */
+describe("generated reproduce.sh is valid bash (bash -n)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-syntax-"));
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  function syntaxOk(script: string, name: string): void {
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, script);
+    execFileSync("bash", ["-n", file], { stdio: "pipe" });
+  }
+
+  it.each(DANGEROUS)("parses when the repro command is %s", (cmd) => {
+    syntaxOk(
+      buildReproduceSh(inputFor(cmd)),
+      `d-${Buffer.from(cmd).toString("hex").slice(0, 12)}.sh`,
+    );
+  });
+
+  it.each([
+    "npm",
+    "pnpm",
+    "yarn",
+    "pip",
+    "uv",
+    "cargo",
+    "go",
+    "maven",
+    "gradle",
+    "dotnet",
+    "ruby",
+    "unknown",
+  ])("parses for the %s ecosystem install block", (id) => {
+    const input = inputFor("make test");
+    input.ecosystem = { ...input.ecosystem, id: id as BundleInput["ecosystem"]["id"] };
+    syntaxOk(buildReproduceSh(input), `eco-${id}.sh`);
+  });
+
+  it("parses for an install-less bundle with no runnable command (exit 5 path)", () => {
+    const sh = buildReproduceSh(noCommandInput());
+    expect(sh).toMatch(/NO REPRO COMMAND/);
+    syntaxOk(sh, "no-cmd.sh");
+  });
+});
+
+function noCommandInput(): BundleInput {
+  const input = inputFor("");
+  input.ecosystem = {
+    ...input.ecosystem,
+    id: "unknown",
+    testCommand: "# see failure.txt for the failing command",
+  };
+  return input;
+}
+
+describe("generated reproduce.ps1 carries the same exit-code contract", () => {
+  it("emits exit 3 for a failed dependency setup and exit 4 at the prompt", () => {
+    const ps1 = buildReproducePs1(inputFor("npm test"));
+    expect(ps1).toMatch(/INSTALL_FAILED/);
+    expect(ps1).toMatch(/exit 3/);
+    expect(ps1).toMatch(/exit 4/);
+  });
+
+  it("uses a NO REPRO COMMAND message when there is nothing to run", () => {
+    expect(buildReproducePs1(noCommandInput())).toMatch(/NO REPRO COMMAND/);
+    expect(buildReproducePs1(noCommandInput())).toMatch(/exit 5/);
   });
 });

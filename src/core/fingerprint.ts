@@ -135,7 +135,9 @@ export function compareFingerprints(
 /** sha256 over bundle content files (hex). Excludes itself by construction. */
 export function hashBundleFiles(files: Array<{ name: string; content: string }>): string {
   const h = createHash("sha256");
-  const sorted = [...files].sort((a, b) => (a.name < b.name ? -1 : 1));
+  const sorted = [...files].sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+  );
   for (const f of sorted) {
     h.update(`--- ${f.name} ---\n`, "utf8");
     h.update(f.content, "utf8");

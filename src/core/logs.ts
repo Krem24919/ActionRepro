@@ -17,10 +17,6 @@ export function loadLogsFromFile(filePath: string): LoadedLogs {
   };
 }
 
-export function logsFromText(text: string, displayName: string): LoadedLogs {
-  return { source: "github", displayName, raw: text, lines: splitLines(text) };
-}
-
 export function splitLines(text: string): string[] {
   return text.split(/\r?\n/);
 }

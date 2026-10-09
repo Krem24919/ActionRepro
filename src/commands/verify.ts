@@ -10,6 +10,7 @@ import {
   compareFingerprints,
   type VerifyVerdict,
 } from "../core/fingerprint.js";
+import { listCwdFiles } from "../utils/fs.js";
 
 export interface VerifyInput {
   bundleDir: string;
@@ -34,14 +35,6 @@ interface StoredMeta {
   fingerprintVersion?: string;
   ecosystem?: string;
   failure?: { summary?: string; reproCommand?: string; exitCode?: number | null };
-}
-
-function localProjectFiles(): string[] {
-  try {
-    return fs.readdirSync(process.cwd());
-  } catch {
-    return [];
-  }
 }
 
 function inconclusive(
@@ -125,6 +118,27 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
   const failure = extractFailure(lines);
   const recordedExitCode = meta.failure?.exitCode ?? null;
 
+  if (!failure.matched && failure.exitCode !== undefined && failure.exitCode !== 0) {
+    // The command failed (non-zero exit) but printed no diagnostic we can
+    // fingerprint. That is NOT evidence the CI failure is gone: calling it
+    // NOT_REPRODUCED made `prove` report "fixed" for silent failures.
+    return {
+      verdict: "INCONCLUSIVE",
+      bundleDir: input.bundleDir,
+      logFile: input.logFile,
+      recordedFingerprint: recorded,
+      freshFingerprint: null,
+      recordedExitCode,
+      freshExitCode: failure.exitCode,
+      recordedSummary: meta.failure?.summary,
+      freshSummary: undefined,
+      reason:
+        `The fresh log shows a failing exit code (${failure.exitCode}) but no recognizable failure ` +
+        "diagnostic, so it cannot be matched against the recorded failure. Inspect the output of the " +
+        "command, or make it print its error, then verify again.",
+    };
+  }
+
   if (!failure.matched) {
     return {
       verdict: "NOT_REPRODUCED",
@@ -145,7 +159,7 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
   }
 
   const fresh = fingerprintFailure({
-    ecosystem: meta.ecosystem ?? detectEcosystem(lines, localProjectFiles()).id,
+    ecosystem: meta.ecosystem ?? detectEcosystem(lines, listCwdFiles()).id,
     reproCommand: failure.reproCommand ?? meta.failure?.reproCommand ?? "",
     // A fresh log without its own exit marker falls back to the recorded CI
     // code: the code confirms a failure, it does not define its identity.

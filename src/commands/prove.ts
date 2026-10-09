@@ -11,7 +11,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { runReproduceScript } from "../core/runner.js";
+import { EXIT_ABORTED, EXIT_NO_COMMAND, EXIT_SETUP_FAILED } from "../core/bundle.js";
 import { verifyBundle, type VerifyResult } from "./verify.js";
+import { redactText } from "../core/redact.js";
 import {
   markFixed as historyMarkFixed,
   recordLog as historyRecordLog,
@@ -36,6 +38,11 @@ export interface ProveResult {
   bundleDir: string;
   logFile: string;
   runExitCode?: number;
+  /**
+   * Redacted tail of a `--run` capture. The captured log itself is a temp file
+   * that is deleted after verification, so this is what the caller can show.
+   */
+  runOutputTail?: string;
   verdict?: VerifyResult["verdict"];
   recordedFingerprint: string | null;
   freshFingerprint: string | null;
@@ -58,6 +65,21 @@ function unable(bundleDir: string, logFile: string, reason: string): ProveResult
 }
 
 export async function proveFix(input: ProveInput): Promise<ProveResult> {
+  // The captured run output lives in a temp dir; it must not outlive this call.
+  const scratch: string[] = [];
+  try {
+    const result = await runProve(input, scratch);
+    if (scratch.length > 0 && result.logFile.startsWith(scratch[0])) {
+      result.runOutputTail = redactedTail(result.logFile);
+      result.logFile = "";
+    }
+    return result;
+  } finally {
+    for (const dir of scratch) fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+async function runProve(input: ProveInput, scratch: string[]): Promise<ProveResult> {
   const bundleDir = input.bundleDir;
   let logFile = input.logFile ?? "";
   let runExitCode: number | undefined;
@@ -75,6 +97,7 @@ export async function proveFix(input: ProveInput): Promise<ProveResult> {
       );
     }
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-prove-"));
+    scratch.push(dir);
     logFile = path.join(dir, "run.log");
     try {
       runExitCode = runReproduceScript(bundleDir, {
@@ -87,6 +110,26 @@ export async function proveFix(input: ProveInput): Promise<ProveResult> {
         logFile,
         `Cannot run bundle: ${err instanceof Error ? err.message : String(err)}`,
       );
+    }
+    // The captured output tells whether the repro command itself ran. Only the
+    // script prints these lines, and only after its command finished.
+    const output = readOutput(logFile);
+    const commandRan = /==> \[actionrepro\] (NOT )?REPRODUCED:/.test(output);
+    if (!commandRan) {
+      // Setup failed, the user aborted, or there was no command: the failure was
+      // never reproduced. Exit codes 3/4/5 are only "script-level" when this holds,
+      // because the repro command may itself exit 3/4/5.
+      const notRun = scriptNotRunReason(runExitCode);
+      if (notRun) return unable(bundleDir, logFile, notRun);
+      // A script that exits non-zero without its header never started (missing
+      // file, no shell). Exit 0 without a header simply ran; verification decides.
+      if (runExitCode !== 0 && !output.includes("==> [actionrepro]")) {
+        return unable(
+          bundleDir,
+          logFile,
+          `The bundle did not start (exit ${runExitCode}, no output from reproduce.sh). Nothing was reproduced.`,
+        );
+      }
     }
   }
 
@@ -174,11 +217,47 @@ export async function proveFix(input: ProveInput): Promise<ProveResult> {
   };
 }
 
+const RUN_TAIL_LINES = 60;
+
+function redactedTail(logFile: string): string {
+  const lines = redactText(readOutput(logFile)).text.split(/\r?\n/);
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+  return lines.slice(-RUN_TAIL_LINES).join("\n");
+}
+
+function readOutput(logFile: string): string {
+  try {
+    return fs.readFileSync(logFile, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+/** Why a script exit code means "the failure was never reproduced", if it does. */
+export function scriptNotRunReason(code: number | undefined): string | null {
+  if (code === EXIT_SETUP_FAILED) {
+    return (
+      "The bundle's dependency setup failed (exit 3): an environment problem, not a reproduction. " +
+      "Fix the toolchain or dependencies, then run the bundle again."
+    );
+  }
+  if (code === EXIT_ABORTED) {
+    return "The bundle was aborted at the confirmation prompt (exit 4): the repro command never ran.";
+  }
+  if (code === EXIT_NO_COMMAND) {
+    return (
+      "The bundle has no runnable repro command (exit 5): nothing was executed. " +
+      "Run the failing command manually and verify its output instead."
+    );
+  }
+  return null;
+}
+
 export function formatProveHuman(r: ProveResult): string {
   const lines = [
     "ActionRepro proof",
     `  bundle: ${r.bundleDir}`,
-    `  log: ${r.logFile || "(none)"}`,
+    `  log: ${r.logFile || (r.runOutputTail !== undefined ? "(captured run output; not kept)" : "(none)")}`,
     r.runExitCode !== undefined ? `  run exit code: ${r.runExitCode}` : null,
     `  state: ${r.state}`,
     r.verdict ? `  verdict: ${r.verdict}` : null,

@@ -107,20 +107,31 @@ const DEFINITIONS: Record<
 
 interface Scored {
   id: Exclude<EcosystemId, "unknown">;
-  score: number;
+  /** Strongest log-based signal. Log rules overlap (e.g. "pip install" and "Traceback"), so only the max counts. */
+  logScore: number;
+  /** Strongest project-file signal, scored separately from log evidence. */
+  fileScore: number;
   evidence: string[];
 }
+
+type EvidenceKind = "log" | "file";
 
 function pushEvidence(
   map: Map<string, Scored>,
   id: Scored["id"],
   points: number,
   ev: string,
+  kind: EvidenceKind = "log",
 ): void {
-  const cur = map.get(id) ?? { id, score: 0, evidence: [] };
-  cur.score += points;
+  const cur = map.get(id) ?? { id, logScore: 0, fileScore: 0, evidence: [] };
+  if (kind === "log") cur.logScore = Math.max(cur.logScore, points);
+  else cur.fileScore = Math.max(cur.fileScore, points);
   if (!cur.evidence.includes(ev)) cur.evidence.push(ev);
   map.set(id, cur);
+}
+
+function totalScore(s: Scored): number {
+  return s.logScore + s.fileScore;
 }
 
 /**
@@ -258,22 +269,24 @@ export function detectEcosystem(
   const files = new Set(projectFiles.map((f) => f.toLowerCase()));
   const hasFile = (...names: string[]) => names.some((n) => files.has(n));
   if (hasFile("pnpm-lock.yaml"))
-    pushEvidence(scores, "pnpm", 4, "project has pnpm-lock.yaml");
-  if (hasFile("yarn.lock")) pushEvidence(scores, "yarn", 4, "project has yarn.lock");
+    pushEvidence(scores, "pnpm", 4, "project has pnpm-lock.yaml", "file");
+  if (hasFile("yarn.lock"))
+    pushEvidence(scores, "yarn", 4, "project has yarn.lock", "file");
   if (hasFile("package-lock.json", "package.json"))
-    pushEvidence(scores, "npm", 3, "project has package.json");
+    pushEvidence(scores, "npm", 3, "project has package.json", "file");
   if (hasFile("pyproject.toml", "requirements.txt", "uv.lock")) {
-    if (hasFile("uv.lock")) pushEvidence(scores, "uv", 4, "project has uv.lock");
-    else pushEvidence(scores, "pip", 3, "project has Python manifest");
+    if (hasFile("uv.lock")) pushEvidence(scores, "uv", 4, "project has uv.lock", "file");
+    else pushEvidence(scores, "pip", 3, "project has Python manifest", "file");
   }
-  if (hasFile("cargo.toml")) pushEvidence(scores, "cargo", 4, "project has Cargo.toml");
-  if (hasFile("go.mod")) pushEvidence(scores, "go", 4, "project has go.mod");
-  if (hasFile("pom.xml")) pushEvidence(scores, "maven", 4, "project has pom.xml");
+  if (hasFile("cargo.toml"))
+    pushEvidence(scores, "cargo", 4, "project has Cargo.toml", "file");
+  if (hasFile("go.mod")) pushEvidence(scores, "go", 4, "project has go.mod", "file");
+  if (hasFile("pom.xml")) pushEvidence(scores, "maven", 4, "project has pom.xml", "file");
   if (hasFile("build.gradle", "build.gradle.kts", "gradlew")) {
-    pushEvidence(scores, "gradle", 4, "project has Gradle build file");
+    pushEvidence(scores, "gradle", 4, "project has Gradle build file", "file");
   }
   if (hasFile("gemfile", "gemfile.lock", "rakefile")) {
-    pushEvidence(scores, "ruby", 4, "project has Ruby manifest");
+    pushEvidence(scores, "ruby", 4, "project has Ruby manifest", "file");
   }
 
   if (scores.size === 0) {
@@ -288,40 +301,12 @@ export function detectEcosystem(
     };
   }
 
-  const ranked = [...scores.values()].sort((a, b) => b.score - a.score);
+  const ranked = [...scores.values()].sort((a, b) => totalScore(b) - totalScore(a));
   const best = ranked[0];
   const def = DEFINITIONS[best.id];
-  const confidence = best.score >= 10 ? "high" : best.score >= 5 ? "medium" : "low";
+  const score = totalScore(best);
+  // A single direct signal (for example `pytest` on its own, 8 points) is high confidence.
+  // Only one strong log rule counts per category, so 8 is the top of the usual range.
+  const confidence = score >= 8 ? "high" : score >= 5 ? "medium" : "low";
   return { ...def, confidence, evidence: best.evidence };
-}
-
-export function ecosystemInstallFallback(id: EcosystemId): string {
-  switch (id) {
-    case "npm":
-      return "npm ci";
-    case "node":
-      return "npm ci";
-    case "pnpm":
-      return "pnpm install --frozen-lockfile";
-    case "yarn":
-      return "yarn install --frozen-lockfile";
-    case "pip":
-      return "python -m pip install -r requirements.txt";
-    case "uv":
-      return "uv sync";
-    case "cargo":
-      return "cargo fetch";
-    case "go":
-      return "go mod download";
-    case "maven":
-      return "mvn -B dependency:resolve";
-    case "gradle":
-      return "./gradlew -q dependencies";
-    case "dotnet":
-      return "dotnet restore";
-    case "ruby":
-      return "bundle install";
-    default:
-      return "# install your project dependencies first";
-  }
 }

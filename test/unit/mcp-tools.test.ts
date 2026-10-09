@@ -312,3 +312,56 @@ describe("tool calls", () => {
     }
   });
 });
+
+describe("reproduce run:true over MCP keeps stdout for JSON-RPC only", () => {
+  it("captures the script output, returns its tail, and writes nothing else to stdout", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-mcp-"));
+    const log = path.join(dir, "exit5.log");
+    fs.writeFileSync(
+      log,
+      [
+        '2024-05-02T11:00:03.0000000Z ##[group]Run node -e "process.exit(5)"',
+        '2024-05-02T11:00:03.0000000Z node -e "process.exit(5)"',
+        "2024-05-02T11:00:04.0000000Z ##[error]Process completed with exit code 5.",
+        "",
+      ].join("\n"),
+    );
+    // The bundle installs dependencies in the current directory (npm ci for an
+    // npm repo). Run from the temp dir so the repo under test is never touched.
+    const repoCwd = process.cwd();
+    process.chdir(dir);
+    const writes: string[] = [];
+    const realWrite = process.stdout.write.bind(process.stdout);
+    (process.stdout as { write: unknown }).write = (chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    };
+    try {
+      const s = new McpServer();
+      const r = resOf(
+        await s.handleLine(
+          req(9, "tools/call", {
+            name: "reproduce",
+            arguments: { target: log, outDir: path.join(dir, "bundle"), run: true },
+          }),
+        ),
+      );
+      const text = JSON.stringify(r);
+      expect(text).toContain("REPRODUCED: command exited with code 5");
+      const payload = JSON.parse(
+        (
+          (r["result"] as { content: Array<{ text: string }> }).content[0] as {
+            text: string;
+          }
+        ).text,
+      ) as { runOutputTail?: string; exitCode?: number };
+      expect(payload.exitCode).toBe(5);
+      expect(payload.runOutputTail).toContain("result: exit_code=5");
+    } finally {
+      (process.stdout as { write: unknown }).write = realWrite;
+      process.chdir(repoCwd);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    expect(writes.join("")).not.toMatch(/REPRODUCED|actionrepro\] running/);
+  });
+});
