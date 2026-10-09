@@ -1,104 +1,71 @@
 /**
- * Minimal, strictly best-effort extraction of a step's `run:` script from
- * workflow YAML text. This is NOT a YAML parser. Lookup order:
+ * Best-effort extraction of a step's `run:` script from workflow YAML text.
+ * The YAML is parsed with a real parser (`yaml`, pure JavaScript, no code
+ * execution, alias expansion limited), so indentation style does not matter.
+ *
+ * Lookup order:
  *
  *   1. Scope to the failing *job* (by Jobs-API name) when it identifies
- *      exactly one `jobs:<id>` block — otherwise the first name match in the
- *      file wins, which can be the wrong job when step names repeat.
- *   2. Match `- name: <step>` exactly (case-insensitive).
+ *      exactly one job — otherwise the first name match in the file wins,
+ *      which can be the wrong job when step names repeat.
+ *   2. Match `name:` exactly (case-insensitive).
  *   3. Match unnamed `run:` steps via GitHub's synthesized display name
  *      `Run <first script line>` (that is how they appear in the Steps API).
  *
- * Returns null when unsure — callers must degrade gracefully, never guess.
+ * Returns null when unsure or when the YAML does not parse — callers must
+ * degrade gracefully, never guess.
  */
+import { parse } from "yaml";
 
 export interface StepScript {
   stepName: string;
   script: string;
 }
 
-function indentOf(line: string): number {
-  const m = line.match(/^ */);
-  return m ? m[0].length : 0;
+/** Parse options: aliases are capped (YAML alias bombs), duplicate keys are rejected. */
+const PARSE_OPTIONS = { maxAliasCount: 100 } as const;
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
-function stripQuotes(s: string): string {
-  const t = s.trim();
-  return t.length >= 2 &&
-    ((t.startsWith("'") && t.endsWith("'")) || (t.startsWith('"') && t.endsWith('"')))
-    ? t.slice(1, -1)
-    : t;
-}
-
-/** Read the `run:` value starting at line `runIdx` (`rest` = text after `run:`). */
-function readRunValue(lines: string[], runIdx: number, rest: string): string | null {
-  const text = rest.trim();
-  if (text !== "" && !/^[|>][-+]?$/.test(text)) {
-    return stripQuotes(text) || null;
+function parseWorkflow(yaml: string): Record<string, unknown> | null {
+  try {
+    const doc: unknown = parse(yaml, PARSE_OPTIONS);
+    return isRecord(doc) ? doc : null;
+  } catch {
+    return null;
   }
-  // Block scalar: collect more-indented lines.
-  const runIndent = indentOf(lines[runIdx]);
-  const block: string[] = [];
-  for (let k = runIdx + 1; k < lines.length; k++) {
-    const lk = lines[k];
-    if (lk.trim() === "") {
-      block.push("");
-      continue;
-    }
-    if (indentOf(lk) <= runIndent) break;
-    block.push(lk.slice(runIndent + 2));
+}
+
+/** Every step object under any `steps:` list in this subtree, in document order. */
+function collectSteps(
+  node: unknown,
+  out: Record<string, unknown>[] = [],
+): Record<string, unknown>[] {
+  if (Array.isArray(node)) {
+    for (const item of node) collectSteps(item, out);
+    return out;
   }
-  const script = block.join("\n").replace(/\n+$/, "");
-  return script || null;
-}
-
-interface JobBlock {
-  id: string;
-  name: string | null;
-  start: number;
-  end: number;
-}
-
-/** Split the `jobs:` mapping into per-job line ranges (best-effort). */
-function jobBlocks(lines: string[]): JobBlock[] | null {
-  const jobsIdx = lines.findIndex((l) => /^jobs:\s*(#.*)?$/.test(l));
-  if (jobsIdx < 0) return null;
-  const blocks: JobBlock[] = [];
-  let cur: { id: string; start: number } | null = null;
-  const close = (end: number) => {
-    if (!cur) return;
-    let nm: string | null = null;
-    for (let k = cur.start + 1; k < end; k++) {
-      const m = lines[k].match(/^ {4}name\s*:\s*(.+?)\s*$/);
-      if (m) {
-        nm = stripQuotes(m[1]);
-        break;
-      }
-    }
-    blocks.push({ id: cur.id, name: nm, start: cur.start, end });
-    cur = null;
-  };
-  for (let i = jobsIdx + 1; i <= lines.length; i++) {
-    const done = i >= lines.length;
-    const l = done ? "" : lines[i];
-    const m = done ? null : l.match(/^ {2}([^:\s#][^:]*?):\s*(#.*)?$/);
-    if (m) {
-      close(i);
-      cur = { id: m[1].trim(), start: i };
-      continue;
-    }
-    if (
-      done ||
-      (l.trim() !== "" &&
-        !l.startsWith(" ") &&
-        !l.startsWith("\t") &&
-        !l.trim().startsWith("#"))
-    ) {
-      close(i); // Left the jobs: section (or EOF).
-      break;
+  if (!isRecord(node)) return out;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "steps" && Array.isArray(value)) {
+      for (const step of value) if (isRecord(step)) out.push(step);
+    } else {
+      collectSteps(value, out);
     }
   }
-  return blocks;
+  return out;
+}
+
+/** Display name of a job: its `name:` when set, otherwise nothing (the id is used). */
+function jobDisplayName(job: unknown): string | null {
+  return isRecord(job) && typeof job.name === "string" ? job.name : null;
+}
+
+/** Trailing newlines from block scalars are not part of the command. */
+function cleanScript(run: string): string {
+  return run.replace(/\n+$/, "");
 }
 
 /**
@@ -121,44 +88,33 @@ export function extractStepScript(
   stepName: string,
   jobName?: string,
 ): StepScript | null {
-  const lines = yaml.split(/\r?\n/);
-  let scope = lines;
-  if (jobName?.trim()) {
-    const blocks = jobBlocks(lines);
-    if (blocks) {
-      const hits = blocks.filter((b) => jobMatches(b.id, b.name, jobName));
-      if (hits.length === 1) scope = lines.slice(hits[0].start, hits[0].end);
-    }
+  const doc = parseWorkflow(yaml);
+  if (!doc) return null;
+
+  let scope: unknown = doc;
+  if (jobName?.trim() && isRecord(doc.jobs)) {
+    const hits = Object.entries(doc.jobs).filter(([id, job]) =>
+      jobMatches(id, jobDisplayName(job), jobName),
+    );
+    if (hits.length === 1) scope = hits[0][1];
   }
+  const steps = collectSteps(scope);
   const want = stepName.trim().toLowerCase();
 
-  // Pass 1: exact `- name:` match.
-  for (let i = 0; i < scope.length; i++) {
-    const stepMatch = scope[i].match(/^\s*-\s*name\s*:\s*(.+?)\s*$/);
-    if (!stepMatch) continue;
-    const found = stripQuotes(stepMatch[1]).toLowerCase();
-    if (found !== want) continue;
-    const baseIndent = indentOf(scope[i]);
-    for (let j = i + 1; j < scope.length; j++) {
-      const lj = scope[j];
-      if (lj.trim() === "" || lj.trim().startsWith("#")) continue;
-      if (indentOf(lj) <= baseIndent && lj.trim() !== "") return null;
-      const runMatch = lj.match(/^\s*run\s*:\s*(.*)$/);
-      if (!runMatch) {
-        if (/^\s*-\s*\w/.test(lj) && indentOf(lj) <= baseIndent + 2) return null;
-        continue;
-      }
-      const script = readRunValue(scope, j, runMatch[1]);
-      return script ? { stepName, script } : null;
-    }
-    return null;
+  // Pass 1: exact `name:` match. A named step without a usable `run:` is not
+  // guessed at: return null.
+  for (const step of steps) {
+    if (typeof step.name !== "string" || step.name.trim().toLowerCase() !== want)
+      continue;
+    if (typeof step.run !== "string") return null;
+    const script = cleanScript(step.run);
+    return script ? { stepName, script } : null;
   }
 
   // Pass 2: unnamed `run:` steps, shown by the API as `Run <first line>`.
-  for (let i = 0; i < scope.length; i++) {
-    const runMatch = scope[i].match(/^\s*-\s*run\s*:(.*)$/);
-    if (!runMatch) continue;
-    const script = readRunValue(scope, i, runMatch[1]);
+  for (const step of steps) {
+    if (typeof step.run !== "string") continue;
+    const script = cleanScript(step.run);
     if (!script) continue;
     if (`run ${firstMeaningfulLine(script).toLowerCase()}` === want) {
       return { stepName, script };
