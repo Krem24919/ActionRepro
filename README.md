@@ -186,15 +186,15 @@ Authentication notes (verified against the live GitHub API):
 
 ## What the bundle contains
 
-| File              | Purpose                                                                                                                                                                                                          |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reproduce.sh`    | Bash repro script (Linux/macOS/Termux/Git Bash), `chmod +x` ready                                                                                                                                                |
-| `reproduce.ps1`   | PowerShell repro script for Windows                                                                                                                                                                              |
-| `README.md`       | Human summary: source, failure, env, how to run                                                                                                                                                                    |
-| `failure.txt`     | Redacted failure excerpt + error context                                                                                                                                                                           |
-| `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint                                                                                                                                                              |
-| `repro.json`      | Machine-readable redacted metadata, including `generatedAt` (ISO time the bundle was written), `bundleSha256`, and `reproCommandSource` (log, CI workflow, or ecosystem default)                                   |
-| `bundle.sha256`   | Integrity hash over the bundle content files                                                                                                                                                                       |
+| File              | Purpose                                                                                                                                                                          |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reproduce.sh`    | Bash repro script (Linux/macOS/Termux/Git Bash), `chmod +x` ready                                                                                                                |
+| `reproduce.ps1`   | PowerShell repro script for Windows                                                                                                                                              |
+| `README.md`       | Human summary: source, failure, env, how to run                                                                                                                                  |
+| `failure.txt`     | Redacted failure excerpt + error context                                                                                                                                         |
+| `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint                                                                                                                            |
+| `repro.json`      | Machine-readable redacted metadata, including `generatedAt` (ISO time the bundle was written), `bundleSha256`, and `reproCommandSource` (log, CI workflow, or ecosystem default) |
+| `bundle.sha256`   | Integrity hash over the bundle content files                                                                                                                                     |
 
 Each bundle also records a **failure fingerprint** (stable hash of ecosystem,
 command, exit code, error kind, and the failure anchor line — the single most
