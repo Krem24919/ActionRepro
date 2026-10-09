@@ -29,13 +29,10 @@ function toolVersion(cmd: string, args: string[]): string | null {
 
 async function networkOk(): Promise<{ ok: boolean; detail: string }> {
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 8000);
     const res = await fetch("https://api.github.com/rate_limit", {
       headers: { "User-Agent": "actionrepro", Accept: "application/vnd.github+json" },
-      signal: ctrl.signal,
+      signal: AbortSignal.timeout(8000),
     });
-    clearTimeout(t);
     if (res.ok || res.status === 403 || res.status === 401) {
       return { ok: true, detail: `reachable (HTTP ${res.status})` };
     }
@@ -117,7 +114,7 @@ export async function doctor(): Promise<DoctorResult> {
     }
   }
 
-  const { token, source } = resolveTokenWithSource();
+  const { source } = resolveTokenWithSource();
   checks.push({
     name: "github-token",
     ok: true,
@@ -126,7 +123,6 @@ export async function doctor(): Promise<DoctorResult> {
         ? "absent — set GITHUB_TOKEN, or install + auth the gh CLI (used automatically)"
         : `available via ${source} (will be used for API; never printed)`,
   });
-  void token;
 
   const net = await networkOk();
   checks.push({ name: "network(api.github.com)", ok: net.ok, detail: net.detail });

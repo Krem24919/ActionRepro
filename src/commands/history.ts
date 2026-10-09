@@ -20,14 +20,7 @@ import {
   type HistoryLookup,
   type HistoryStats,
 } from "../core/history.js";
-
-function localProjectFiles(): string[] {
-  try {
-    return fs.readdirSync(process.cwd());
-  } catch {
-    return [];
-  }
-}
+import { listCwdFiles } from "../utils/fs.js";
 
 export function recordLog(
   historyFile: string | undefined,
@@ -48,7 +41,7 @@ export function recordLog(
   if (failure.errorLines.length === 0) {
     throw new Error(`Cannot record "${logFile}": no failure content found.`);
   }
-  const eco = detectEcosystem(lines, localProjectFiles());
+  const eco = detectEcosystem(lines, listCwdFiles());
   const reproCommand = failure.reproCommand ?? eco.testCommand;
   return appendHistory(resolveHistoryFile(historyFile), {
     kind: "failure",

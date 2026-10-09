@@ -188,9 +188,13 @@ export function commandsAgree(
   const b = logCommand.trim().split("\n")[0]?.trim() ?? "";
   if (!a || !b) return null;
   const norm = (s: string) => s.replace(/\s+/g, " ").trim();
-  if (norm(a) === norm(b)) return true;
-  // The log often shows the expanded/resolved form; agree when one side
-  // starts with the other (e.g. `npm test` vs `npm test -- --runInBand`).
-  if (norm(b).startsWith(norm(a)) || norm(a).startsWith(norm(b))) return true;
+  const na = norm(a);
+  const nb = norm(b);
+  if (na === nb) return true;
+  // The log often shows the expanded/resolved form; agree when one side is the
+  // other plus extra arguments (`npm test` vs `npm test -- --runInBand`). The
+  // boundary must be a space: `go test` must not "agree" with `go testify`.
+  const extendsWords = (short: string, long: string) => long.startsWith(`${short} `);
+  if (extendsWords(na, nb) || extendsWords(nb, na)) return true;
   return false;
 }

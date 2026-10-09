@@ -6,7 +6,11 @@ import {
   resolveGitLabToken,
 } from "../../src/providers/gitlab.js";
 import { findProvider, resolveProviderToken } from "../../src/providers/registry.js";
-import { allLogsFailed, firstLogError } from "../../src/core/github.js";
+import {
+  allLogsFailed,
+  firstLogError,
+  logFetchPlaceholder,
+} from "../../src/core/github.js";
 
 const ENV_KEY = "GITLAB_TOKEN";
 const savedEnv = process.env[ENV_KEY];
@@ -206,5 +210,66 @@ describe("provider registry", () => {
     expect(resolveProviderToken("gitlab", "flag")).toBe("flag");
     process.env[ENV_KEY] = "gl-token";
     expect(resolveProviderToken("gitlab")).toBe("gl-token");
+  });
+});
+
+describe("GitLab pagination and trace placeholders", () => {
+  const PIPE = "https://gitlab.com/g/r/-/pipelines/77";
+
+  function manyJobsHandler(total: number, failingTrace: string | "403"): Handler {
+    return (url: string) => {
+      if (url.endsWith("/pipelines/77")) return jsonResponse(PIPELINE);
+      const jobsMatch = url.match(/\/pipelines\/77\/jobs\?per_page=(\d+)&page=(\d+)/);
+      if (jobsMatch) {
+        const perPage = Number(jobsMatch[1]);
+        const page = Number(jobsMatch[2]);
+        const start = (page - 1) * perPage;
+        const batch = [];
+        for (let i = start; i < Math.min(total, start + perPage); i++) {
+          batch.push({ id: 1000 + i, name: `job-${i}`, status: "success" });
+        }
+        return jsonResponse(batch);
+      }
+      const trace = url.match(/\/jobs\/(\d+)\/trace$/);
+      if (trace) {
+        if (failingTrace === "403" && trace[1] === "1005") {
+          return jsonResponse("forbidden", 403);
+        }
+        return jsonResponse(`log for ${trace[1]}\n`);
+      }
+      throw new Error(`unexpected URL: ${url}`);
+    };
+  }
+
+  it("fetches every job of a pipeline with more than one page of results", async () => {
+    const { calls } = stubFetch(manyJobsHandler(230, "ok"));
+    const r = await new GitLabProvider().fetch(PIPE, {});
+    expect(r.jobs).toHaveLength(230);
+    expect(r.logsByJob.size).toBe(230);
+    // Pages of 100: pages 1..3 requested, page 3 is short so it stops there.
+    const pageCalls = calls.filter((c) => c.url.includes("/jobs?per_page=100"));
+    expect(pageCalls).toHaveLength(3);
+  });
+
+  it("stops after one page when the pipeline is small", async () => {
+    const { calls } = stubFetch(manyJobsHandler(2, "ok"));
+    const r = await new GitLabProvider().fetch(PIPE, {});
+    expect(r.jobs).toHaveLength(2);
+    expect(calls.filter((c) => c.url.includes("/jobs?per_page=100"))).toHaveLength(1);
+  });
+
+  it("a failed trace becomes an id-only placeholder that the reason survives", async () => {
+    stubFetch(manyJobsHandler(6, "403"));
+    const r = await new GitLabProvider().fetch(PIPE, {});
+    const placeholder = r.logsByJob.get("1005") ?? "";
+    expect(placeholder.startsWith("(could not fetch logs for job 1005: ")).toBe(true);
+    expect(placeholder).toContain("HTTP 403");
+  });
+
+  it("a job name containing ':' does not corrupt firstLogError", () => {
+    const logs = new Map([
+      ["7", logFetchPlaceholder(7, "Private projects need GITLAB_TOKEN.")],
+    ]);
+    expect(firstLogError(logs)).toBe("Private projects need GITLAB_TOKEN.");
   });
 });

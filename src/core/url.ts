@@ -38,7 +38,3 @@ export function parseGitHubRunUrl(input: string): ParsedRunUrl | null {
 export function isGitHubRunUrl(input: string): boolean {
   return parseGitHubRunUrl(input) !== null;
 }
-
-export function toRunHtmlUrl(owner: string, repo: string, runId: string): string {
-  return `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
-}

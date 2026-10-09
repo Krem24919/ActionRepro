@@ -280,32 +280,3 @@ export function detectEcosystem(
   const confidence = best.score >= 10 ? "high" : best.score >= 5 ? "medium" : "low";
   return { ...def, confidence, evidence: best.evidence };
 }
-
-export function ecosystemInstallFallback(id: EcosystemId): string {
-  switch (id) {
-    case "npm":
-      return "npm ci";
-    case "pnpm":
-      return "pnpm install --frozen-lockfile";
-    case "yarn":
-      return "yarn install --frozen-lockfile";
-    case "pip":
-      return "python -m pip install -r requirements.txt";
-    case "uv":
-      return "uv sync";
-    case "cargo":
-      return "cargo fetch";
-    case "go":
-      return "go mod download";
-    case "maven":
-      return "mvn -B dependency:resolve";
-    case "gradle":
-      return "./gradlew -q dependencies";
-    case "dotnet":
-      return "dotnet restore";
-    case "ruby":
-      return "bundle install";
-    default:
-      return "# install your project dependencies first";
-  }
-}

@@ -123,11 +123,29 @@ const ERROR_PATTERNS: { re: RegExp; weight: number; label: string; meta?: boolea
     label: "Gradle build failure",
   },
   { re: /\bError: .+/, weight: 60, label: "Error line" },
+  // Named errors: `TypeError: ...`, `ReferenceError: ...`, `SyntaxError: ...`.
+  // `\bError:` alone misses them (no word boundary inside `TypeError`).
+  {
+    re: /\b[A-Z][A-Za-z]*(?:Error|Exception): .+/,
+    weight: 60,
+    label: "named error line",
+  },
   { re: /✖|× .*fail/i, weight: 50, label: "cross failure glyph" },
   { re: /##\[error\]\s*\S+/, weight: 40, label: "annotation error" },
 ];
 
-const RUN_LINE_RES = [/^\s*Run\s+(.+?)\s*$/, /^\s*\$\s+(.+?)\s*$/, /^\s*\+ (.+?)\s*$/];
+/**
+ * Lines that announce the command of a step. Real GitHub logs print the step
+ * header as `##[group]Run <cmd>` (the timestamp is stripped by normalization);
+ * the plain `Run <cmd>` form is kept for pasted logs and older fixtures.
+ */
+const RUN_LINE_RES = [
+  /^\s*(?:##\[group\])?Run\s+(.+?)\s*$/,
+  /^\s*\$\s+(.+?)\s*$/,
+  // bash -x trace (`+ npm test`). Only accepted for known tools: a diff such as
+  // Jest's `+ Received` must never become the repro command (it would be run).
+  /^\s*\+\s+((?:npm|npx|pnpm|yarn|jest|vitest|mocha|pytest|python3?|uv|pip3?|cargo|go|make|mvn|gradle|\.\/gradlew|gradlew|dotnet|bundle|rspec|rake|ruby|node|bash|sh|\.\/[\w./-]+)\s.+?)\s*$/,
+];
 
 /**
  * Deterministic failure extraction:

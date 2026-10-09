@@ -94,10 +94,13 @@ describe("prove CLI (isolated history file, no network)", () => {
         state: string;
         runExitCode: number;
         logFile: string;
+        runOutputTail?: string;
       };
       expect(body.state).toBe("fixed");
       expect(body.runExitCode).toBe(0);
-      expect(fs.readFileSync(body.logFile, "utf8")).toContain("all-green");
+      // The captured log is a temp file: it is removed, and its redacted tail is returned.
+      expect(body.logFile).toBe("");
+      expect(JSON.parse(r.out).runOutputTail).toContain("all-green");
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }

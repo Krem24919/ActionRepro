@@ -12,6 +12,8 @@
  */
 
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { inspectTarget } from "../commands/inspect.js";
 import { reproduceTarget } from "../commands/reproduce.js";
 import { verifyBundle } from "../commands/verify.js";
@@ -29,6 +31,7 @@ import {
   stats as historyStats,
 } from "../commands/history.js";
 import { proveFix } from "../commands/prove.js";
+import { listCwdFiles } from "../utils/fs.js";
 
 export interface TextBlock {
   type: "text";
@@ -84,14 +87,6 @@ function optBool(args: Record<string, unknown>, key: string): boolean | undefine
   return v;
 }
 
-function localProjectFiles(): string[] {
-  try {
-    return fs.readdirSync(process.cwd());
-  } catch {
-    return [];
-  }
-}
-
 async function handleInspect(args: Record<string, unknown>): Promise<ToolResult> {
   const r = await inspectTarget({
     target: needStr(args, "target"),
@@ -100,14 +95,44 @@ async function handleInspect(args: Record<string, unknown>): Promise<ToolResult>
   return ok(r);
 }
 
+/** Lines kept from a captured script run; enough for an agent to see the outcome. */
+const RUN_TAIL_LINES = 60;
+
+/**
+ * `reproduce` with run:true executes the bundle. Its output must NOT reach our
+ * stdout (that stream carries only JSON-RPC lines), so it is captured to a
+ * temporary file and the redacted tail is returned in the tool result.
+ */
 async function handleReproduce(args: Record<string, unknown>): Promise<ToolResult> {
-  const r = await reproduceTarget({
-    target: needStr(args, "target"),
-    outDir: optStr(args, "outDir") ?? "actionrepro",
-    run: optBool(args, "run") ?? false,
-    token: optStr(args, "token"),
-  });
-  return ok(r);
+  const run = optBool(args, "run") ?? false;
+  let captureDir: string | undefined;
+  let runOutputFile: string | undefined;
+  if (run) {
+    captureDir = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-mcp-run-"));
+    runOutputFile = path.join(captureDir, "run.log");
+  }
+  try {
+    const r = await reproduceTarget({
+      target: needStr(args, "target"),
+      outDir: optStr(args, "outDir") ?? "actionrepro",
+      run,
+      token: optStr(args, "token"),
+      runOutputFile,
+    });
+    return ok({
+      ...r,
+      runOutputTail: runOutputFile ? tailOfFile(runOutputFile) : undefined,
+    });
+  } finally {
+    if (captureDir) fs.rmSync(captureDir, { recursive: true, force: true });
+  }
+}
+
+function tailOfFile(file: string): string {
+  if (!fs.existsSync(file)) return "";
+  const lines = redactText(fs.readFileSync(file, "utf8")).text.split(/\r?\n/);
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();
+  return lines.slice(-RUN_TAIL_LINES).join("\n");
 }
 
 async function handleVerify(args: Record<string, unknown>): Promise<ToolResult> {
@@ -134,7 +159,7 @@ async function handleFingerprint(args: Record<string, unknown>): Promise<ToolRes
   if (failure.errorLines.length === 0) {
     throw new ToolError(`No failure content found in "${logFile}".`);
   }
-  const eco = detectEcosystem(lines, localProjectFiles());
+  const eco = detectEcosystem(lines, listCwdFiles());
   const fp = fingerprintFailure({
     ecosystem: eco.id,
     reproCommand: failure.reproCommand ?? eco.testCommand,

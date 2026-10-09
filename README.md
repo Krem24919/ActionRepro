@@ -115,7 +115,8 @@ actionrepro verify ./actionrepro ./local-run.log [--json]
 actionrepro prove ./actionrepro ./local-run.log [--json]
 actionrepro prove ./actionrepro --run [--cwd ./my-repo]
 # state: fixed (exit 0), still-failing / changed-failure (exit 1),
-# inconclusive / unable-to-reproduce (exit 2)
+# inconclusive / unable-to-reproduce (exit 2). --json uses the same codes.
+# The bundle's own exit codes are listed under "Exit codes" below.
 
 # Check toolchains / network / token
 actionrepro doctor
@@ -236,8 +237,8 @@ ActionRepro verification
 ```
 
 Exit codes are CI-friendly: `0` = REPRODUCED, `1` = NOT_REPRODUCED,
-`2` = INCONCLUSIVE (bundle or log unreadable). Add `--json` for the
-machine-readable form. The comparison is a stable hash over ecosystem,
+`2` = INCONCLUSIVE (bundle or log unreadable). `--json` changes the output
+format only, never the exit code. The comparison is a stable hash over ecosystem,
 command, exit code, error kind, and the failure anchor line — no
 probabilities, just match / differ / unreadable.
 
@@ -248,7 +249,32 @@ Verdicts in practice:
   (the command exited 0: that is what "my fix worked" looks like).
 - `INCONCLUSIVE` — the fresh log is missing/empty/unreadable, or the bundle
   was created before 0.1.0 (older fingerprints hashed a context window and
-  cannot be compared with the current algorithm — re-create the bundle).
+  cannot be compared with the current algorithm — re-create the bundle). It
+  also covers a run that exits non-zero but prints no recognizable failure
+  diagnostic: that is not evidence the failure is gone, so it is never
+  reported as "fixed".
+
+## Exit codes
+
+`reproduce.sh` (generated bundle script):
+
+| Code  | Meaning                                                                                         |
+| ----- | ----------------------------------------------------------------------------------------------- |
+| `3`   | Dependency setup failed (`INSTALL_FAILED`). Environment problem; the repro command did not run. |
+| `4`   | Aborted at the confirmation prompt. Nothing ran.                                                |
+| `5`   | No runnable repro command was identified (`NO REPRO COMMAND`). Nothing ran.                     |
+| other | The repro command's own exit code (`REPRODUCED`).                                               |
+
+Codes `3`, `4` and `5` can also be a repro command's own exit code. The
+script's `REPRODUCED:` / `NOT REPRODUCED:` line says whether the command ran,
+and `prove --run` relies on that line, so a command that exits `5` is still
+verified rather than reported as "no command".
+
+`reproduce --run` exits with the bundle's code, so CI can gate on it.
+
+`prove --run` captures the script output in a temporary file, verifies it,
+and deletes the file. The result returns a redacted tail as `runOutputTail`
+instead, so no raw CI output is left in the temp directory.
 
 Lines that the bundle's own script prints start with `==> [actionrepro]` and
 are ignored during comparison, so piping the script's output into the fresh

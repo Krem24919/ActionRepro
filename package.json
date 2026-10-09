@@ -23,7 +23,7 @@
   ],
   "type": "commonjs",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.js",
+  "types": "./dist/index.d.ts",
   "bin": {
     "actionrepro": "./dist/cli.js"
   },

@@ -34,6 +34,12 @@ export interface GitHubJob {
 
 const API_BASE = "https://api.github.com";
 
+/**
+ * Upper bound for one API request (headers + body). Without it a stalled
+ * connection would hang `reproduce`/`inspect` forever.
+ */
+export const HTTP_TIMEOUT_MS = 60_000;
+
 export function authHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {
     Accept: "application/vnd.github+json",
@@ -89,7 +95,10 @@ export function resolveToken(explicit?: string): string | undefined {
 }
 
 async function getJson(url: string, token?: string): Promise<any> {
-  const res = await fetch(url, { headers: authHeaders(token) });
+  const res = await fetch(url, {
+    headers: authHeaders(token),
+    signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+  });
   if (res.status === 404) {
     throw new Error(
       `GitHub API 404 for ${url}. Check owner/repo/run id. For private repos set GITHUB_TOKEN.`,
@@ -111,7 +120,10 @@ async function getJson(url: string, token?: string): Promise<any> {
 }
 
 async function getText(url: string, token?: string): Promise<string> {
-  const res = await fetch(url, { headers: authHeaders(token) });
+  const res = await fetch(url, {
+    headers: authHeaders(token),
+    signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     if (res.status === 401 || res.status === 403) {
@@ -127,6 +139,15 @@ async function getText(url: string, token?: string): Promise<string> {
 }
 
 const LOG_FETCH_FAILURE_PREFIX = "(could not fetch logs for job";
+
+/**
+ * Placeholder protocol (see ARCHITECTURE.md): an undownloadable job log is
+ * `(could not fetch logs for job <id>: <reason>)`. The job id never contains
+ * a colon, so the reason is always everything after the first `: `.
+ */
+export function logFetchPlaceholder(jobId: string | number, reason: string): string {
+  return `${LOG_FETCH_FAILURE_PREFIX} ${jobId}: ${reason})`;
+}
 
 export function allLogsFailed(logsByJob: Map<string, string>): boolean {
   if (logsByJob.size === 0) return true;
@@ -180,15 +201,6 @@ export async function fetchJobs(
 
 /** Plain-text logs for a single job (official endpoint, no scraping). */
 export async function fetchJobLogs(
-  owner: string,
-  repo: string,
-  jobId: number | string,
-  token?: string,
-): Promise<string> {
-  return getText(`${API_BASE}/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, token);
-}
-
-export async function fetchJobLogsById(
   owner: string,
   repo: string,
   jobId: number | string,
@@ -263,21 +275,10 @@ export async function fetchRunBundle(
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const placeholder = `(could not fetch logs for job ${job.name}: ${msg})`;
+      const placeholder = logFetchPlaceholder(job.id, msg);
       logsByJob.set(String(job.id), placeholder);
       parts.push(`\n===== JOB: ${job.name} =====\n${placeholder}`);
     }
   }
   return { run, jobs, logsByJob, combinedLogs: parts.join("\n") };
-}
-
-export function pickFailingJob(jobs: GitHubJob[]): GitHubJob | undefined {
-  return (
-    jobs.find((j) => j.conclusion === "failure") ??
-    jobs.find((j) => j.steps?.some((s) => s.conclusion === "failure"))
-  );
-}
-
-export function pickFailingStep(job?: GitHubJob): string | undefined {
-  return job?.steps?.find((s) => s.conclusion === "failure")?.name;
 }

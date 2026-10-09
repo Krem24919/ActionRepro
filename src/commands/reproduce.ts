@@ -10,20 +10,22 @@ import { detectRuntime } from "../core/runtime.js";
 import { createBundle } from "../core/bundle.js";
 import { runReproduceScript } from "../core/runner.js";
 import { allLogsFailed, firstLogError, fetchWorkflowFile } from "../core/github.js";
+import { selectFailure } from "../core/selection.js";
 import { fingerprintFailure } from "../core/fingerprint.js";
 import { extractStepScript, commandsAgree } from "../core/workflow.js";
 import type { BundleInput } from "../core/bundle.js";
-import type { CiFetchResult } from "../providers/types.js";
-
-function failingJobFrom(fetched: CiFetchResult): string | undefined {
-  return fetched.jobs.find((j) => j.conclusion === "failure")?.name;
-}
+import { listCwdFiles } from "../utils/fs.js";
 
 export interface ReproduceOptions {
   target: string;
   outDir?: string;
   run?: boolean;
   token?: string;
+  /**
+   * When running, capture the script's output into this file instead of
+   * inheriting stdio. Required for MCP: its stdout carries JSON-RPC only.
+   */
+  runOutputFile?: string;
 }
 
 export interface ReproduceResult {
@@ -36,14 +38,6 @@ export interface ReproduceResult {
   exitCode?: number;
 }
 
-function localProjectFiles(): string[] {
-  try {
-    return fs.readdirSync(process.cwd());
-  } catch {
-    return [];
-  }
-}
-
 export async function reproduceTarget(opts: ReproduceOptions): Promise<ReproduceResult> {
   const outDir = path.resolve(opts.outDir ?? "actionrepro");
 
@@ -52,7 +46,7 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
     const red = redactText(loaded.raw);
     const lines = red.text.split(/\r?\n/);
     const failure = extractFailure(lines);
-    const eco = detectEcosystem(lines, localProjectFiles());
+    const eco = detectEcosystem(lines, listCwdFiles());
     const runtime = detectRuntime(lines);
     const reproCommand = failure.reproCommand ?? eco.testCommand;
     const bundle = createBundle(
@@ -74,7 +68,8 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
       outDir,
     );
     let exitCode: number | undefined;
-    if (opts.run) exitCode = runReproduceScript(outDir);
+    if (opts.run)
+      exitCode = runReproduceScript(outDir, { outputFile: opts.runOutputFile });
     return {
       outDir,
       files: bundle.files,
@@ -101,23 +96,15 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
   if (allLogsFailed(fetched.logsByJob)) {
     throw new Error(
       `Cannot build a bundle: ${firstLogError(fetched.logsByJob)} ` +
-        `(failing job from metadata: ${failingJobFrom(fetched) ?? "unknown"}). ` +
+        `(failing job from metadata: ${selectFailure(fetched.jobs).failingJob ?? "unknown"}). ` +
         tokenHint,
     );
   }
   const red = redactText(fetched.combinedLogs);
   const lines = red.text.split(/\r?\n/);
-  const failingJob = fetched.jobs.find((j) => j.conclusion === "failure")?.name;
-  let failingStep: string | undefined;
-  for (const j of fetched.jobs) {
-    const s = j.steps?.find((x) => x.conclusion === "failure");
-    if (s) {
-      failingStep = s.name;
-      break;
-    }
-  }
+  const { failingJob, failingStep } = selectFailure(fetched.jobs);
   const failure = extractFailure(lines, { failingJob, failingStep });
-  const eco = detectEcosystem(lines, localProjectFiles());
+  const eco = detectEcosystem(lines, listCwdFiles());
   const runtime = detectRuntime(lines);
   let reproCommand = failure.reproCommand ?? eco.testCommand;
   let commandSource: "workflow" | "log" | "fallback" = failure.reproCommand
@@ -188,7 +175,7 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
     outDir,
   );
   let exitCode: number | undefined;
-  if (opts.run) exitCode = runReproduceScript(outDir);
+  if (opts.run) exitCode = runReproduceScript(outDir, { outputFile: opts.runOutputFile });
   return {
     outDir,
     files: bundle.files,

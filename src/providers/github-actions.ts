@@ -48,16 +48,3 @@ export class GitHubActionsProvider implements CiProvider {
     };
   }
 }
-
-export function failingJobName(result: CiFetchResult): string | undefined {
-  const j = result.jobs.find((x) => x.conclusion === "failure");
-  return j?.name;
-}
-
-export function failingStepName(result: CiFetchResult): string | undefined {
-  for (const j of result.jobs) {
-    const s = j.steps?.find((x) => x.conclusion === "failure");
-    if (s) return s.name;
-  }
-  return undefined;
-}

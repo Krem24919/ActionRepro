@@ -1,5 +1,6 @@
 import { spawnSync, type StdioOptions } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 
 export interface RunOptions {
   cwd?: string;
@@ -13,7 +14,10 @@ export interface RunOptions {
 
 export function runReproduceScript(outDir: string, opts: RunOptions = {}): number {
   const isWin = process.platform === "win32";
-  const script = isWin ? `${outDir}\\reproduce.ps1` : `${outDir}/reproduce.sh`;
+  // Absolute: the script runs with cwd = the repo under test, so a relative
+  // bundle path (e.g. `actionrepro/`) would no longer resolve.
+  const dir = path.resolve(outDir);
+  const script = isWin ? path.join(dir, "reproduce.ps1") : path.join(dir, "reproduce.sh");
   if (!fs.existsSync(script)) {
     throw new Error(`Reproduce script not found: ${script}`);
   }
@@ -25,7 +29,7 @@ export function runReproduceScript(outDir: string, opts: RunOptions = {}): numbe
     if (isWin) {
       const r = spawnSync("powershell", ["-ExecutionPolicy", "Bypass", "-File", script], {
         stdio,
-        cwd: opts.cwd ?? outDir,
+        cwd: opts.cwd ?? dir,
       });
       return r.status ?? 1;
     }
@@ -34,19 +38,9 @@ export function runReproduceScript(outDir: string, opts: RunOptions = {}): numbe
       stdio,
       cwd: opts.cwd ?? process.cwd(),
     });
+    if (r.error) throw r.error;
     return r.status ?? 1;
   } finally {
     if (outputFd !== undefined) fs.closeSync(outputFd);
-  }
-}
-
-export function commandExists(cmd: string): boolean {
-  const probe = process.platform === "win32" ? "where" : "command";
-  const args = process.platform === "win32" ? [cmd] : ["-v", cmd];
-  try {
-    const r = spawnSync(probe, args, { stdio: "ignore" });
-    return r.status === 0;
-  } catch {
-    return false;
   }
 }

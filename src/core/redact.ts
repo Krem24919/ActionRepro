@@ -53,9 +53,12 @@ const PATTERNS: RegExp[] = [
   /\bghs_[A-Za-z0-9]{20,}\b/g,
   /\bghr_[A-Za-z0-9]{20,}\b/g,
   /github_pat_[A-Za-z0-9_]{10,}/g,
-  // Generic bearer / basic
-  /\bBearer\s+[A-Za-z0-9\-._~+/=]{10,}/g,
-  /\bBasic\s+[A-Za-z0-9+/=]{10,}/g,
+  // Generic bearer / basic. A value counts as a credential only when it looks
+  // like one: mixed letters+digits/symbols (>= 10 chars), or a long pure-letter
+  // run (>= 24 chars). Plain prose such as "Basic authentication failed" or
+  // "Bearer token rejected" must not be mangled into "[REDACTED]".
+  /\bBearer\s+(?:(?=[A-Za-z0-9\-._~+/=]*[0-9._~+/=])[A-Za-z0-9\-._~+/=]{10,}|[A-Za-z]{24,})/g,
+  /\bBasic\s+(?:(?=[A-Za-z0-9+/=]*[0-9+/=])[A-Za-z0-9+/=]{10,}|[A-Za-z]{24,})/g,
   // AWS keys
   /\bAKIA[0-9A-Z]{16}\b/g,
   /\baws_secret_access_key\s*[:=]\s*['"]?[^'"\s]+['"]?/gi,
@@ -121,26 +124,6 @@ export function redactText(input: string): RedactResult {
   return { text, redactions };
 }
 
-export function redactLines(lines: string[]): { lines: string[]; redactions: number } {
-  let total = 0;
-  const out = lines.map((l) => {
-    const r = redactText(l);
-    total += r.redactions;
-    return r.text;
-  });
-  return { lines: out, redactions: total };
-}
-
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Quick check used in tests: no obvious credential survives. */
-export function looksClean(text: string): boolean {
-  const probe = redactText(text);
-  return probe.text === text || !containsTokenShape(probe.text);
-}
-
-function containsTokenShape(text: string): boolean {
-  return /\bghp_[A-Za-z0-9]{20,}\b/.test(text);
 }

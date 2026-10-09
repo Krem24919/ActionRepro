@@ -6,15 +6,8 @@ import { extractFailure } from "../core/extract.js";
 import { detectEcosystem } from "../core/ecosystems.js";
 import { detectRuntime } from "../core/runtime.js";
 import { allLogsFailed, firstLogError } from "../core/github.js";
-import type { CiFetchResult } from "../providers/types.js";
-
-function failingStepOf(fetched: CiFetchResult): string | undefined {
-  for (const j of fetched.jobs) {
-    const s = j.steps?.find((x) => x.conclusion === "failure");
-    if (s) return s.name;
-  }
-  return undefined;
-}
+import { selectFailure } from "../core/selection.js";
+import { listCwdFiles } from "../utils/fs.js";
 
 export interface InspectInput {
   target: string;
@@ -38,14 +31,6 @@ export interface InspectResult {
   runtime: Record<string, string | undefined>;
 }
 
-function localProjectFiles(): string[] {
-  try {
-    return fs.readdirSync(process.cwd());
-  } catch {
-    return [];
-  }
-}
-
 export async function inspectTarget(input: InspectInput): Promise<InspectResult> {
   // Local file mode
   if (fs.existsSync(input.target) && fs.statSync(input.target).isFile()) {
@@ -53,7 +38,7 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
     const red = redactText(loaded.raw);
     const lines = red.text.split(/\r?\n/);
     const failure = extractFailure(lines);
-    const eco = detectEcosystem(lines, localProjectFiles());
+    const eco = detectEcosystem(lines, listCwdFiles());
     const runtime = detectRuntime(lines);
     return {
       source: input.target,
@@ -80,7 +65,8 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
   }
   const token = resolveProviderToken(provider.id, input.token);
   const fetched = await provider.fetch(input.target, { token });
-  const failingJob = fetched.jobs.find((j) => j.conclusion === "failure")?.name;
+  const selection = selectFailure(fetched.jobs);
+  const failingJob = selection.failingJob;
   if (allLogsFailed(fetched.logsByJob)) {
     return {
       source: input.target,
@@ -90,7 +76,7 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
       evidence: [],
       summary: `Logs unavailable: ${firstLogError(fetched.logsByJob)}`,
       failingJob,
-      failingStep: failingStepOf(fetched),
+      failingStep: selection.failingStep,
       hint:
         provider.id === "gitlab"
           ? "Set GITLAB_TOKEN and retry, or download the job trace manually and run: actionrepro inspect ./failure.log"
@@ -101,9 +87,9 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
   }
   const red = redactText(fetched.combinedLogs);
   const lines = red.text.split(/\r?\n/);
-  const failingStep = failingStepOf(fetched);
+  const failingStep = selection.failingStep;
   const failure = extractFailure(lines, { failingJob, failingStep });
-  const eco = detectEcosystem(lines, localProjectFiles());
+  const eco = detectEcosystem(lines, listCwdFiles());
   const runtime = detectRuntime(lines);
   return {
     source: input.target,
