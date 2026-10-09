@@ -27,6 +27,14 @@ All notable changes to this project will be documented in this file. Format foll
   state — fixed, still-failing, changed-failure, inconclusive, or
   unable-to-reproduce — with CI-friendly exits (0/1/1/2/2). The agent edits
   code; `prove` never does.
+- Every generated bundle is now syntax-checked: new
+  `test/integration/scripts.test.ts` builds a bundle from each fixture and
+  asserts `bash -n` passes, all files exist, and `bundle.sha256`
+  recomputes. Install step uses `set -e` instead of per-line
+  `|| exit $?` (which broke multi-line conditionals).
+- Repro command transparency: `repro.json`, `failure.txt`, `inspect`, and
+  the MCP `fingerprint` tool report whether the command came from the log,
+  the CI workflow, or an ecosystem default.
 - GitLab CI provider: pipeline and job URLs (gitlab.com and self-hosted)
   work in `inspect`/`reproduce` like GitHub run URLs, via a provider
   registry (`findProvider`, `resolveProviderToken`). Token: `--token` flag
@@ -34,7 +42,9 @@ All notable changes to this project will be documented in this file. Format foll
   vocabulary; per-step data and the workflow cross-check stay GitHub-only.
 - New ecosystems with real detection, repro scripts, and fixtures:
   `maven` (`mvn -B test`), `gradle` (`./gradlew test`), `dotnet`
-  (`dotnet test`), `ruby` (`bundle exec rspec`). New extract patterns
+  (`dotnet test`), `ruby` (`bundle exec rspec`), `node` (`node --test`
+  with TAP output — no longer misread as `pip`). Bare `AssertionError`
+  no longer counts as a Python signal on its own. New extract patterns
   (assertion diffs, Maven/Gradle summaries, .NET/xUnit diagnostics, RSpec
   failures, `file:line` with `:line N` and `# ` forms) plus `java`/`.NET`/
   `ruby` runtime detection and `doctor` toolchain probes.

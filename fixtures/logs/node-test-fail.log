@@ -1,0 +1,17 @@
+2024-05-05T10:00:00.0000000Z Current runner version: '2.311.0'
+2024-05-05T10:00:01.0000000Z Operating System: Ubuntu 22.04.4 LTS
+2024-05-05T10:00:02.0000000Z ##[group]Run actions/checkout@v4
+2024-05-05T10:00:03.0000000Z ##[endgroup]
+2024-05-05T10:00:04.0000000Z ##[group]Run node --test
+2024-05-05T10:00:05.0000000Z TAP version 13
+2024-05-05T10:00:05.0000000Z # Subtest: adds numbers
+2024-05-05T10:00:05.0000000Z not ok 1 - adds numbers
+2024-05-05T10:00:05.0000000Z   ---
+2024-05-05T10:00:05.0000000Z   error: 'Assertion failed'
+2024-05-05T10:00:05.0000000Z   code: 'ERR_ASSERTION'
+2024-05-05T10:00:05.0000000Z   expected: 4
+2024-05-05T10:00:05.0000000Z   actual: 3
+2024-05-05T10:00:05.0000000Z   ...
+2024-05-05T10:00:06.0000000Z # fail 1
+2024-05-05T10:00:06.0000000Z # pass 0
+2024-05-05T10:00:06.0000000Z ##[error]Process completed with exit code 1.

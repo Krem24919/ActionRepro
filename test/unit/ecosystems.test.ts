@@ -46,6 +46,11 @@ describe("detectEcosystem", () => {
     expect(e.id).toBe("ruby");
     expect(e.confidence).toBe("high");
   });
+  it("detects node --test (TAP) instead of misreading it as pip", () => {
+    const e = detectEcosystem(lines("node-test-fail.log"));
+    expect(e.id).toBe("node");
+    expect(e.confidence).toBe("high");
+  });
   it("detects new ecosystems from project manifests alone", () => {
     expect(detectEcosystem([], ["pom.xml"]).id).toBe("maven");
     expect(detectEcosystem([], ["build.gradle.kts"]).id).toBe("gradle");

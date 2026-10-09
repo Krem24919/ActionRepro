@@ -31,6 +31,7 @@ export interface ReproduceResult {
   files: string[];
   summary: string;
   reproCommand?: string;
+  reproCommandSource: "log" | "ecosystem-default" | "workflow";
   ecosystem: string;
   redactions: number;
   exitCode?: number;
@@ -63,6 +64,7 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
         failure,
         redactedLogs: red.text,
         redactions: red.redactions,
+        reproCommandSource: failure.reproCommand ? "log" : "ecosystem-default",
         fingerprint: fingerprintFailure({
           ecosystem: eco.id,
           reproCommand,
@@ -80,6 +82,7 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
       files: bundle.files,
       summary: failure.summary,
       reproCommand,
+      reproCommandSource: failure.reproCommand ? "log" : "ecosystem-default",
       ecosystem: eco.id,
       redactions: red.redactions,
       exitCode,
@@ -175,6 +178,12 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
       },
       redactedLogs: red.text,
       redactions: red.redactions,
+      reproCommandSource:
+        commandSource === "workflow"
+          ? "workflow"
+          : failure.reproCommand
+            ? "log"
+            : "ecosystem-default",
       fingerprint: fingerprintFailure({
         ecosystem: eco.id,
         reproCommand,
@@ -194,6 +203,12 @@ export async function reproduceTarget(opts: ReproduceOptions): Promise<Reproduce
     files: bundle.files,
     summary: failure.summary,
     reproCommand,
+    reproCommandSource:
+      commandSource === "workflow"
+        ? "workflow"
+        : failure.reproCommand
+          ? "log"
+          : "ecosystem-default",
     ecosystem: eco.id,
     redactions: red.redactions,
     exitCode,

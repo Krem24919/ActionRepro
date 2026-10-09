@@ -8,6 +8,14 @@ export const npmAdapter: EcosystemAdapter = {
   manifests: ["package.json", "package-lock.json"],
 };
 
+export const nodeAdapter: EcosystemAdapter = {
+  id: "node",
+  installCommand: "npm ci",
+  testCommand: "node --test",
+  runHint: "Node.js built-in test runner.",
+  manifests: ["package.json"],
+};
+
 export const pnpmAdapter: EcosystemAdapter = {
   id: "pnpm",
   installCommand: "pnpm install --frozen-lockfile",

@@ -2,6 +2,7 @@ import { normalizedLines } from "./logs.js";
 
 export type EcosystemId =
   | "npm"
+  | "node"
   | "pnpm"
   | "yarn"
   | "pip"
@@ -32,6 +33,13 @@ const DEFINITIONS: Record<
     installCommand: "npm ci",
     testCommand: "npm test",
     runHint: "Node.js with npm. Uses package.json / package-lock.json when present.",
+  },
+  node: {
+    id: "node",
+    installCommand: "npm ci",
+    testCommand: "node --test",
+    runHint:
+      "Node.js built-in test runner (no npm involved). Installs via npm when package.json exists.",
   },
   pnpm: {
     id: "pnpm",
@@ -133,6 +141,16 @@ export function detectEcosystem(
   if (has(/^\s*Run\s+npm\s/m) || has(/\bnpm (ci|install|test|run)\b/)) {
     pushEvidence(scores, "npm", 10, "log mentions npm command");
   }
+  // Node's built-in runner (TAP output, no npm anywhere in the log).
+  if (has(/^TAP version \d+/m) || has(/^\s*Run\s+node\s+(--test|test)\b/m)) {
+    pushEvidence(scores, "node", 10, "log mentions node --test");
+  }
+  if (has(/^not ok \d+/m)) {
+    pushEvidence(scores, "node", 8, "log contains TAP failure");
+  }
+  if (has(/\bnode --test\b/) || has(/\bERR_ASSERTION\b/)) {
+    pushEvidence(scores, "node", 6, "log contains Node assertion marker");
+  }
   if (
     has(/^\s*Run\s+pnpm\s/m) ||
     has(/\bpnpm\s+(install|test|run|exec)\b/) ||
@@ -196,11 +214,7 @@ export function detectEcosystem(
     pushEvidence(scores, "pnpm", 6, "log contains pnpm error");
   if (has(/yarn error|error Command failed.*yarn/i))
     pushEvidence(scores, "yarn", 6, "log contains yarn error");
-  if (
-    has(
-      /Traceback \(most recent call last\)|ModuleNotFoundError|AssertionError|FAILED .*\.py/,
-    )
-  ) {
+  if (has(/Traceback \(most recent call last\)|ModuleNotFoundError|FAILED .*\.py/)) {
     pushEvidence(scores, "pip", 5, "log contains Python traceback");
   }
   if (
@@ -284,6 +298,8 @@ export function detectEcosystem(
 export function ecosystemInstallFallback(id: EcosystemId): string {
   switch (id) {
     case "npm":
+      return "npm ci";
+    case "node":
       return "npm ci";
     case "pnpm":
       return "pnpm install --frozen-lockfile";

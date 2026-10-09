@@ -33,6 +33,8 @@ export interface InspectResult {
   failingStep?: string;
   exitCode?: number;
   reproCommand?: string;
+  /** Whether the repro command was found in the log or is an ecosystem fallback. */
+  reproCommandSource: "log" | "ecosystem-default";
   hint: string;
   redactions: number;
   runtime: Record<string, string | undefined>;
@@ -65,6 +67,7 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
       failingStep: failure.failingStep,
       exitCode: failure.exitCode,
       reproCommand: failure.reproCommand ?? eco.testCommand,
+      reproCommandSource: failure.reproCommand ? "log" : "ecosystem-default",
       hint: failure.hint,
       redactions: red.redactions,
       runtime: runtime as unknown as Record<string, string | undefined>,
@@ -91,6 +94,7 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
       summary: `Logs unavailable: ${firstLogError(fetched.logsByJob)}`,
       failingJob,
       failingStep: failingStepOf(fetched),
+      reproCommandSource: "ecosystem-default",
       hint:
         provider.id === "gitlab"
           ? "Set GITLAB_TOKEN and retry, or download the job trace manually and run: actionrepro inspect ./failure.log"
@@ -116,6 +120,7 @@ export async function inspectTarget(input: InspectInput): Promise<InspectResult>
     failingStep: failure.failingStep ?? failingStep,
     exitCode: failure.exitCode,
     reproCommand: failure.reproCommand ?? eco.testCommand,
+    reproCommandSource: failure.reproCommand ? "log" : "ecosystem-default",
     hint: failure.hint,
     redactions: red.redactions,
     runtime: runtime as unknown as Record<string, string | undefined>,
@@ -132,7 +137,7 @@ export function formatInspectHuman(r: InspectResult): string {
     r.failingJob ? `failing job: ${r.failingJob}` : null,
     r.failingStep ? `failing step: ${r.failingStep}` : null,
     r.exitCode !== undefined ? `exit code: ${r.exitCode}` : null,
-    `repro command: ${r.reproCommand ?? "(none found)"}`,
+    `repro command: ${r.reproCommand ?? "(none found)"}${r.reproCommandSource === "log" ? " (from the log)" : " (ecosystem default — not found in the log; review it)"}`,
     `hint: ${r.hint}`,
     `redactions: ${r.redactions}`,
     `runtime: Node=${r.runtime.node ?? "?"} Python=${r.runtime.python ?? "?"} Go=${r.runtime.go ?? "?"} Rust=${r.runtime.rust ?? "?"} OS=${r.runtime.os ?? "?"}`,

@@ -150,6 +150,7 @@ async function handleFingerprint(args: Record<string, unknown>): Promise<ToolRes
     ecosystemConfidence: eco.confidence,
     summary: failure.summary,
     reproCommand: failure.reproCommand ?? eco.testCommand,
+    reproCommandSource: failure.reproCommand ? "log" : "ecosystem-default",
     exitCode: failure.exitCode ?? null,
     errorLines: failure.errorLines.slice(0, MAX_LINES),
     errorLinesTruncated: failure.errorLines.length > MAX_LINES,

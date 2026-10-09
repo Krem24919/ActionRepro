@@ -33,6 +33,7 @@ describe("extractFailure", () => {
       ["gradle-fail.log", "assertion diff", "expected:<4> but was:<3>"],
       ["dotnet-fail.log", "assertion failure", "Assert.Equal() Failure: Values differ"],
       ["ruby-fail.log", "RSpec failure", "Failure/Error: expect(result).to eq(4)"],
+      ["node-test-fail.log", "TAP test failure", "not ok 1 - adds numbers"],
     ];
     for (const [file, kind, needle] of cases) {
       const f = extractFailure(fixture(file));

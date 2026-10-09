@@ -36,6 +36,10 @@
     "ruby-fail.log": {
       "ecosystem": "ruby",
       "anchorContains": "Failure/Error: expect(result).to eq(4)"
+    },
+    "node-test-fail.log": {
+      "ecosystem": "node",
+      "anchorContains": "not ok 1 - adds numbers"
     }
   },
   "summaryMustNotContain": ["Process completed with exit code"],

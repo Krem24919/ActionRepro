@@ -16,7 +16,7 @@ actionrepro https://github.com/OWNER/REPO/actions/runs/RUN_ID
 actionrepro ./failure.log
 ```
 
-It fetches the workflow run + jobs + logs via the official GitHub API, detects the ecosystem (`npm` / `pnpm` / `yarn` / `pip` / `uv` / `cargo` / `go` / `maven` / `gradle` / `dotnet` / `ruby`), extracts the most likely failure cause and the closest repro command, redacts secrets heuristically, and writes a ready-to-run `actionrepro/` folder.
+It fetches the workflow run + jobs + logs via the official GitHub API, detects the ecosystem (`npm` / `node --test` / `pnpm` / `yarn` / `pip` / `uv` / `cargo` / `go` / `maven` / `gradle` / `dotnet` / `ruby`), extracts the most likely failure cause and the closest repro command, redacts secrets heuristically, and writes a ready-to-run `actionrepro/` folder.
 
 ## Before / after
 
@@ -169,15 +169,15 @@ Authentication notes (verified against the live GitHub API):
 
 ## What the bundle contains
 
-| File              | Purpose                                                           |
-| ----------------- | ----------------------------------------------------------------- |
-| `reproduce.sh`    | Bash repro script (Linux/macOS/Termux/Git Bash), `chmod +x` ready |
-| `reproduce.ps1`   | PowerShell repro script for Windows                               |
-| `README.md`       | Human summary: source, failure, env, how to run                   |
-| `failure.txt`     | Redacted failure excerpt + error context                          |
-| `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint             |
-| `repro.json`      | Machine-readable redacted metadata                                |
-| `bundle.sha256`   | Integrity hash over the bundle content files                      |
+| File              | Purpose                                                                                                        |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- |
+| `reproduce.sh`    | Bash repro script (Linux/macOS/Termux/Git Bash), `chmod +x` ready                                              |
+| `reproduce.ps1`   | PowerShell repro script for Windows                                                                            |
+| `README.md`       | Human summary: source, failure, env, how to run                                                                |
+| `failure.txt`     | Redacted failure excerpt + error context                                                                       |
+| `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint                                                          |
+| `repro.json`      | Machine-readable redacted metadata (incl. whether the repro command came from the log or an ecosystem default) |
+| `bundle.sha256`   | Integrity hash over the bundle content files                                                                   |
 
 Each bundle also records a **failure fingerprint** (stable hash of ecosystem,
 command, exit code, error kind, and the failure anchor line — the single most
@@ -193,6 +193,7 @@ the recorded fingerprint — no probabilities, just match / differ / unreadable.
 The script is ecosystem-aware:
 
 - `npm` → `npm ci` (fallback `npm install`) then `npm test` (or the exact failing command)
+- `node` → `npm ci` (if `package.json` exists) then `node --test`
 - `pnpm` → `pnpm install --frozen-lockfile` then `pnpm test`
 - `yarn` → `yarn install --frozen-lockfile` then `yarn test`
 - `pip` → `pip install -r requirements.txt` then `pytest`

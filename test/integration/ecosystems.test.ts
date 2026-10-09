@@ -38,6 +38,12 @@ const CASES: Array<{ log: string; ecosystem: string; install: string; command: s
       install: "bundle install",
       command: "bundle exec rspec",
     },
+    {
+      log: "node-test-fail.log",
+      ecosystem: "node",
+      install: "package.json",
+      command: "node --test",
+    },
   ];
 
 describe("new ecosystems end to end (local fixtures, no network)", () => {
@@ -65,4 +71,45 @@ describe("new ecosystems end to end (local fixtures, no network)", () => {
       }
     },
   );
+});
+
+describe("repro command source transparency", () => {
+  it("records log vs ecosystem-default in repro.json, failure.txt, and inspect", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-src-"));
+    try {
+      const outLog = path.join(tmp, "b1");
+      runCli(["reproduce", fx("npm-fail.log"), "--out", outLog]);
+      const meta = JSON.parse(
+        fs.readFileSync(path.join(outLog, "repro.json"), "utf8"),
+      ) as {
+        reproCommandSource: string;
+      };
+      expect(meta.reproCommandSource).toBe("log");
+      expect(fs.readFileSync(path.join(outLog, "failure.txt"), "utf8")).toContain(
+        "repro-source: log",
+      );
+
+      const noRunLog = path.join(tmp, "norun.log");
+      fs.writeFileSync(noRunLog, "something broke\nError: boom\n");
+      const outDef = path.join(tmp, "b2");
+      runCli(["reproduce", noRunLog, "--out", outDef]);
+      const meta2 = JSON.parse(
+        fs.readFileSync(path.join(outDef, "repro.json"), "utf8"),
+      ) as {
+        reproCommandSource: string;
+        failure: { reproCommand: string };
+      };
+      expect(meta2.reproCommandSource).toBe("ecosystem-default");
+      expect(fs.readFileSync(path.join(outDef, "failure.txt"), "utf8")).toContain(
+        "repro-source: ecosystem-default",
+      );
+
+      const insp = JSON.parse(runCli(["inspect", noRunLog, "--json"])) as {
+        reproCommandSource: string;
+      };
+      expect(insp.reproCommandSource).toBe("ecosystem-default");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });

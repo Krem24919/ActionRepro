@@ -1,5 +1,6 @@
 import {
   npmAdapter,
+  nodeAdapter,
   pnpmAdapter,
   yarnAdapter,
   pipAdapter,
@@ -16,6 +17,7 @@ import type { EcosystemAdapter } from "./types.js";
 /** Registry pattern: add new adapters here to support new ecosystems. */
 export const ECOSYSTEM_REGISTRY: EcosystemAdapter[] = [
   npmAdapter,
+  nodeAdapter,
   pnpmAdapter,
   yarnAdapter,
   pipAdapter,
