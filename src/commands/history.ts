@@ -35,6 +35,12 @@ export function recordLog(
       `Cannot record "${logFile}": ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+  // extractFailure always returns at least a fallback line (even for a successful log), so the only
+  // reliable "nothing to record" signal here is a blank file. Without this check an empty file was
+  // recorded as a failure with the placeholder summary "Empty logs: no failure found".
+  if (loaded.raw.trim() === "") {
+    throw new Error(`Cannot record "${logFile}": no failure content found.`);
+  }
   const red = redactText(loaded.raw);
   const lines = red.text.split(/\r?\n/);
   const failure = extractFailure(lines);
@@ -123,13 +129,9 @@ export function lookup(
     throw new Error("Cannot look up history: fingerprint is empty.");
   }
   const file = resolveHistoryFile(historyFile);
-  const result = lookupHistory(file, fingerprint.trim());
-  // Nothing recorded for this fingerprint: if the file holds entries from an
-  // older fingerprint algorithm, say so instead of implying "never seen".
-  if (result.failures === 0 && result.fixedCount === 0) {
-    result.legacyEntries = historyStats(file, 0, FINGERPRINT_ALGO).legacyEntries;
-  }
-  return result;
+  // Nothing recorded for this fingerprint: legacyEntries says whether the file holds entries from
+  // an older fingerprint algorithm, so the output does not imply "never seen".
+  return lookupHistory(file, fingerprint.trim(), FINGERPRINT_ALGO);
 }
 
 export function stats(historyFile: string | undefined): HistoryStats {
