@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -124,4 +124,28 @@ describe("CLI integration (local fixtures, no network)", () => {
       expect(failedRequired).toEqual([]);
     }
   }, 150000);
+});
+
+describe("--token handling", () => {
+  it("warns that argv secrets are visible, without printing the token", () => {
+    for (const args of [
+      ["inspect", fx("npm-fail.log"), "--token", "bogus-value"],
+      [fx("npm-fail.log"), "--token", "bogus-value", "--out", "tok-out"],
+    ]) {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-tok-"));
+      try {
+        const r = spawnSync("node", [CLI, ...args], {
+          encoding: "utf8",
+          cwd: tmp,
+          timeout: 30000,
+        });
+        expect(r.status, r.stderr).toBe(0);
+        expect(r.stderr).toMatch(/prefer the GITHUB_TOKEN/);
+        expect(r.stderr).not.toContain("bogus-value");
+        expect(r.stdout).not.toContain("bogus-value");
+      } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
+    }
+  });
 });

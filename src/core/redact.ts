@@ -10,6 +10,8 @@
 const SECRET_ENV_NAMES = [
   "GITHUB_TOKEN",
   "GH_TOKEN",
+  "GITLAB_TOKEN",
+  "GITLAB_PAT",
   "GITHUB_PAT",
   "NPM_TOKEN",
   "NODE_AUTH_TOKEN",
@@ -53,6 +55,28 @@ const PATTERNS: RegExp[] = [
   /\bghs_[A-Za-z0-9]{20,}\b/g,
   /\bghr_[A-Za-z0-9]{20,}\b/g,
   /github_pat_[A-Za-z0-9_]{10,}/g,
+  // GitLab tokens (the tool reads GitLab pipelines, so its own PAT formats
+  // must be covered): glpat- personal/project/group tokens, glrt- runner
+  // tokens, glcbt- CI/build tokens. The prefixes never occur in prose.
+  /\bglpat-[A-Za-z0-9_-]{20,}/g,
+  /\bglrt-[A-Za-z0-9_-]{20,}/g,
+  /\bglcbt-[A-Za-z0-9_-]{20,}/g,
+  // npm granular access tokens (`npm_` + 36 chars). Short `npm_foo`
+  // identifiers in code are left alone by the length floor.
+  /\bnpm_[A-Za-z0-9]{20,}/g,
+  // Bare JWTs (`eyJ` = base64 `{"`, three dot-separated segments). The
+  // `Authorization: Bearer` form above already covers header use.
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+  // Other `sk-` secret keys (OpenAI, Anthropic `sk-ant-`, ...). The `\b`
+  // keeps words like `task-123` or `disk-space` safe; the length floor keeps
+  // short `sk-foo` identifiers safe. (`sk_live_`/`sk_test_` match too.)
+  /\bsk-[A-Za-z0-9_-]{20,}/g,
+  // Google API keys: `AIza` + exactly 35 base64url chars.
+  /\bAIza[0-9A-Za-z_-]{35}/g,
+  // Slack incoming-webhook URLs: the whole URL is the secret.
+  /https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+/g,
+  // Docker config.json auth entries: `"auth": "<base64(user:pass)>"`.
+  /"auth"\s*:\s*"[A-Za-z0-9+/=]{8,}"/g,
   // An `Authorization:` header value is a credential whatever it looks like (a short base64 Basic
   // value such as `dXNlcjpwYXNz` has no digits, so the shape rules below would miss it).
   // Digest parameters are space-separated (`username="x", response="..."`), so that scheme takes the rest of the line.
@@ -105,6 +129,9 @@ export function redactText(input: string): RedactResult {
       if (header) return `${header[1]}[REDACTED]`;
       if (/^Bearer\s+/i.test(m)) return "Bearer [REDACTED]";
       if (/^Basic\s+/i.test(m)) return "Basic [REDACTED]";
+      if (/^https:\/\/hooks\.slack\.com\/services\//.test(m))
+        return "https://hooks.slack.com/services/[REDACTED]";
+      if (/^"auth"\s*:/.test(m)) return '"auth":"[REDACTED]"';
       if (/^https?:\/\//.test(m)) return m.replace(/:\/\/[^@]+@/, "://[REDACTED]@");
       if (/BEGIN .*PRIVATE KEY/.test(m)) return "[REDACTED PRIVATE KEY BLOCK]";
       return "[REDACTED]";

@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Arbitrary command execution from a log filename.** A local log file
+  whose name contains a newline broke out of the `# Source:` comment in
+  `reproduce.sh`/`reproduce.ps1` and executed when the bundle ran
+  (verified live). Display metadata in generated scripts is now
+  newline-collapsed.
+- **Prose log lines no longer become the repro command.** Only the
+  runner-emitted `##[group]Run <cmd>` header is trusted; a bare `Run ...`
+  line (common tool output, e.g. `Run rm -rf build to clean the cache`)
+  used to be extracted verbatim and executed (verified live: directory
+  deleted). Such logs now fall back to `$` lines, direct invocations, or
+  the ecosystem default, recorded via `reproCommandSource`.
+- **Copy-paste-safe `act -j` hint.** Job names are single-quoted (`$()`,
+  backticks, `!` neutralized) instead of double-quoted, so a hostile job
+  name pastes literally instead of executing.
+- **A signal/OOM kill is never reported `fixed`.** Fresh logs showing
+  `Killed`, `Segmentation fault`, or signal exit codes (134/137/139/143)
+  are fingerprinted as process kills, so `prove` reports `changed-failure`
+  (or `inconclusive` for a bare non-zero exit), never `fixed`. Bare
+  `exit status N` markers are now parsed too.
+- **Redaction gaps closed:** GitLab `glpat_`/`glrt_`/`glcbt_` tokens,
+  `npm_…` tokens, bare JWTs, `sk-…` keys, `AIza…` keys, Slack webhook
+  URLs (host kept), Docker `"auth"` entries (key kept), and
+  `GITLAB_TOKEN`/`GITLAB_PAT` values. Lookalikes (`task-123`,
+  short `npm_foo`, `"auth": "ok"`) stay untouched.
+- **`--token` warns** that argv secrets are visible via `ps` and points
+  at `GITHUB_TOKEN`/`GITLAB_TOKEN`.
+- **`bundle.sha256` is now actually checked:** `verify` recomputes it and
+  reports `integrity: ok/mismatch/unchecked` (human + JSON + MCP) without
+  changing the verdict — users legitimately edit bundles. README wording
+  corrected (tamper-evidence, not a signature).
+- **Dogfood workflow:** action outputs travel through `env:`, never
+  spliced into `run:` (same injection class as the fixed `action.yml`
+  case); `upload-artifact` bumped `v4` → `v7`.
+
 ## [0.1.0] - 2026-10-09
 
 > **Versioning restart.** Tags `v0.1.0`–`v0.2.0` were early builds and are now

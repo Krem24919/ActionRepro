@@ -25,6 +25,18 @@ program
   .description("Turn a failed GitHub Actions run into a local reproducibility bundle.")
   .version(VERSION);
 
+// `--token` puts the secret in argv, visible to other users via `ps`.
+// Nudge toward the environment-variable chain instead (never printed either).
+export function warnArgvToken(): void {
+  console.error(
+    "warning: --token exposes the secret in the process list; " +
+      "prefer the GITHUB_TOKEN / GITLAB_TOKEN environment variable.",
+  );
+}
+program.hook("preAction", (_thisCommand, actionCommand) => {
+  if (actionCommand.opts().token) warnArgvToken();
+});
+
 program
   .command("inspect <target>")
   .description("Analyze only: print failure summary without writing files.")
@@ -263,6 +275,7 @@ async function handleDefaultShorthand(argv: string[]): Promise<boolean> {
   const parsed = parseDefaultArgs(argv);
   try {
     if (parsed.run) printRunWarning();
+    if (parsed.token) warnArgvToken();
     const res = await reproduceTarget({
       target: parsed.target,
       outDir: parsed.out,

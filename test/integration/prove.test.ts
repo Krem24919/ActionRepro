@@ -69,6 +69,38 @@ describe("prove CLI (isolated history file, no network)", () => {
     expect(r.out).toMatch(/state: unable-to-reproduce/);
   });
 
+  it("never calls a signal/OOM kill 'fixed'", () => {
+    // Auditor case: the CI failure is an AssertionError, the fresh run dies
+    // with Killed/segfault/137. That is a *different* failure (or an
+    // environment kill), never evidence the original bug is gone.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-provekill-"));
+    const hf = path.join(tmp, "h.jsonl");
+    const outDir = path.join(tmp, "bundle");
+    try {
+      runCli(["reproduce", fx("npm-fail.log"), "--out", outDir]);
+      for (const [name, content, state, code] of [
+        ["killed.log", "running tests...\nKilled\n", "changed-failure", 1],
+        [
+          "segv.log",
+          "running tests...\nSegmentation fault (core dumped)\n",
+          "changed-failure",
+          1,
+        ],
+        ["s137.log", "exporting results...\nexit status 137\n", "changed-failure", 1],
+        ["s1.log", "exporting results...\nexit status 1\n", "inconclusive", 2],
+      ] as Array<[string, string, string, number]>) {
+        const log = path.join(tmp, name);
+        fs.writeFileSync(log, content);
+        const r = runCliCode(["prove", outDir, log, "--history-file", hf]);
+        expect(r.code, name).toBe(code);
+        expect(r.out, name).toMatch(new RegExp(`state: ${state}`));
+        expect(r.out, name).not.toMatch(/state: fixed/);
+      }
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("runs the bundle with --run and captures the log", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-proverun-"));
     const hf = path.join(tmp, "h.jsonl");

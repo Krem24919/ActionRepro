@@ -2,7 +2,12 @@ import { describe, it, expect, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createBundle, type BundleInput } from "../../src/core/bundle.js";
+import {
+  createBundle,
+  checkBundleIntegrity,
+  type BundleInput,
+} from "../../src/core/bundle.js";
+import { verifyBundle } from "../../src/commands/verify.js";
 import { detectEcosystem } from "../../src/core/ecosystems.js";
 import { detectRuntime } from "../../src/core/runtime.js";
 import { extractFailure } from "../../src/core/extract.js";
@@ -99,5 +104,45 @@ describe("generated install block skips an existing node_modules", () => {
     const ps1 = fs.readFileSync(path.join(out, "reproduce.ps1"), "utf8");
     expect(ps1).toContain("Test-Path node_modules");
     expect(ps1).toContain("ACTIONREPRO_REINSTALL");
+  });
+});
+
+describe("checkBundleIntegrity", () => {
+  it("reports ok for a fresh bundle", () => {
+    const out = tmp();
+    createBundle(inputWithRawToken(), out);
+    expect(checkBundleIntegrity(out).status).toBe("ok");
+  });
+
+  it("reports mismatch after a file is modified, with both hashes", () => {
+    const out = tmp();
+    createBundle(inputWithRawToken(), out);
+    fs.appendFileSync(path.join(out, "reproduce.sh"), "\n# edited by hand\n");
+    const r = checkBundleIntegrity(out);
+    expect(r.status).toBe("mismatch");
+    expect(r.expected).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.actual).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.actual).not.toBe(r.expected);
+  });
+
+  it("reports unchecked when the sha file is missing", () => {
+    const out = tmp();
+    createBundle(inputWithRawToken(), out);
+    fs.unlinkSync(path.join(out, "bundle.sha256"));
+    expect(checkBundleIntegrity(out).status).toBe("unchecked");
+  });
+
+  it("verify reports the integrity status without changing the verdict", async () => {
+    const out = tmp();
+    createBundle(inputWithRawToken(), out);
+    const fresh = path.join(out, "fresh.log");
+    fs.writeFileSync(fresh, LOG.join("\n"));
+    const clean = await verifyBundle({ bundleDir: out, logFile: fresh });
+    expect(clean.integrity).toBe("ok");
+    fs.appendFileSync(path.join(out, "failure.txt"), "\n# edited\n");
+    const tampered = await verifyBundle({ bundleDir: out, logFile: fresh });
+    expect(tampered.integrity).toBe("mismatch");
+    expect(tampered.verdict).toBe(clean.verdict);
+    expect(tampered.reason).toMatch(/integrity: MISMATCH/i);
   });
 });

@@ -154,15 +154,17 @@ describe("shDq / psDq", () => {
 });
 
 describe("extraction preserves dangerous commands exactly", () => {
+  // Commands arrive via the runner-emitted `##[group]Run` header (a bare
+  // `Run ...` line is prose until proven otherwise and is never trusted).
   it.each(DANGEROUS)("findReproCommand keeps %s intact", (cmd) => {
     const anchor = "##[error]Process completed with exit code 1.";
-    expect(findReproCommand([`Run ${cmd}`, anchor], 1)).toBe(cmd);
+    expect(findReproCommand([`##[group]Run ${cmd}`, anchor], 1)).toBe(cmd);
   });
 
   it("extractFailure carries the verbatim command through", () => {
     const cmd = "npm test; echo $(whoami) > out.txt";
     const f = extractFailure([
-      `Run ${cmd}`,
+      `##[group]Run ${cmd}`,
       "##[error]Process completed with exit code 1.",
     ]);
     expect(f.reproCommand).toBe(cmd);

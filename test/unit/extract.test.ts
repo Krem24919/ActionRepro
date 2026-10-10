@@ -55,6 +55,48 @@ describe("extractFailure", () => {
     expect(f.exitCode).toBe(1);
   });
 
+  it("never takes a prose 'Run ...' line as the repro command", () => {
+    // Live auditor case: tool output prose ("Run rm -rf build to clean the
+    // cache") must not become the executed command. Only the runner-emitted
+    // `##[group]Run` header is trusted; anything else falls back to `$`,
+    // direct invocations, or the ecosystem default.
+    const f = extractFailure([
+      "Run rm -rf build to clean the cache",
+      "npm ERR! code ELIFECYCLE",
+      "##[error]Process completed with exit code 1.",
+    ]);
+    expect(f.reproCommand).toBeUndefined();
+  });
+
+  it("still trusts the runner's ##[group]Run header", () => {
+    const f = extractFailure([
+      "##[group]Run npm test",
+      "npm ERR! code ELIFECYCLE",
+      "##[error]Process completed with exit code 1.",
+    ]);
+    expect(f.reproCommand).toBe("npm test");
+  });
+
+  it("recognizes a signal/OOM kill as failure evidence, not a clean run", () => {
+    // Without this, a fresh "Killed" log verified as NOT_REPRODUCED and
+    // `prove` reported the unrelated CI failure "fixed".
+    for (const line of [
+      "Killed",
+      "Segmentation fault (core dumped)",
+      "Out of memory: Killed process 1234 (node)",
+    ]) {
+      const f = extractFailure([line, "##[error]Process completed with exit code 137."]);
+      expect(f.matched, line).toBe(true);
+      expect(f.errorKind, line).toBe("process kill (signal/OOM)");
+      expect(f.exitCode, line).toBe(137);
+    }
+  });
+
+  it("parses a bare 'exit status N' marker", () => {
+    const f = extractFailure(["exporting results...", "exit status 137"]);
+    expect(f.exitCode).toBe(137);
+  });
+
   it("ignores actionrepro's own script frame", () => {
     const f = extractFailure([
       "==> [actionrepro] failure: Failure: AssertionError: old recorded failure",

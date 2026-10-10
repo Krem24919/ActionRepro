@@ -116,6 +116,14 @@ const ERROR_PATTERNS: { re: RegExp; weight: number; label: string; meta?: boolea
   { re: /FAILED\b/, weight: 80, label: "FAILED marker" },
   { re: /\bFAIL\b/, weight: 78, label: "FAIL marker" },
   { re: /command not found/, weight: 70, label: "command not found" },
+  {
+    // A process killed by a signal or the OOM killer is failure evidence, not
+    // an absence of failure: without this, a fresh "Killed" log verified as
+    // NOT_REPRODUCED and `prove` reported the unrelated CI failure "fixed".
+    re: /\b(Killed|Segmentation fault|SIGKILL|SIGSEGV|SIGTERM|SIGABRT|SIGBUS|OOMKilled|Out of memory|heap out of memory|exit status 13[479]|exit status 134)\b/i,
+    weight: 66,
+    label: "process kill (signal/OOM)",
+  },
   { re: /BUILD FAILURE/, weight: 70, label: "Maven build failure" },
   {
     re: /FAILURE: Build failed with an exception/,
@@ -135,12 +143,16 @@ const ERROR_PATTERNS: { re: RegExp; weight: number; label: string; meta?: boolea
 ];
 
 /**
- * Lines that announce the command of a step. Real GitHub logs print the step
- * header as `##[group]Run <cmd>` (the timestamp is stripped by normalization);
- * the plain `Run <cmd>` form is kept for pasted logs and older fixtures.
+ * Lines that announce the command of a step. ONLY the runner-emitted header
+ * `##[group]Run <cmd>` is trusted (the timestamp is stripped by
+ * normalization). A bare `Run <cmd>` line is NOT accepted: prose in tool
+ * output routinely starts with "Run" ("Run rm -rf build to clean the
+ * cache"), and accepting it turned prose into the executed repro command.
+ * Pasted logs without headers fall back to `$ <cmd>` lines, direct tool
+ * invocations, or the ecosystem default — all recorded via reproCommandSource.
  */
 const RUN_LINE_RES = [
-  /^\s*(?:##\[group\])?Run\s+(.+?)\s*$/,
+  /^\s*##\[group\]Run\s+(.+?)\s*$/,
   /^\s*\$\s+(.+?)\s*$/,
   // bash -x trace (`+ npm test`). Only accepted for known tools: a diff such as
   // Jest's `+ Received` must never become the repro command (it would be run).
@@ -276,6 +288,10 @@ function parseExitCode(
     /process completed with exit code (\d+)/i,
     /exited with code (\d+)/i,
     /\bexit code\b\s*[:=]?\s*(\d+)/i,
+    // Lowest priority: bare "exit status N" (Go, docker, shells). Without it
+    // a bare "exit status 137" left exitCode unknown; with it such a log is
+    // at worst INCONCLUSIVE, never "fixed".
+    /\bexit status (\d+)/i,
   ];
   for (const source of [lines, rawLines]) {
     for (const re of groups) {

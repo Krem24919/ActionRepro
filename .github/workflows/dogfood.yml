@@ -31,19 +31,26 @@ jobs:
           out: actionrepro-dogfood
       - name: Check outputs and bundle
         shell: bash
+        # Outputs travel through the environment, never spliced into the
+        # script: summaries come from CI logs (untrusted) and would execute
+        # `$()`/backticks if interpolated into `run:` directly.
+        env:
+          OUT_DIR: ${{ steps.repro.outputs.out-dir }}
+          SUMMARY: ${{ steps.repro.outputs.summary }}
+          REPRO: ${{ steps.repro.outputs.repro-command }}
         run: |
           set -euo pipefail
-          test -n "${{ steps.repro.outputs.summary }}"
-          test -n "${{ steps.repro.outputs.repro-command }}"
+          test -n "$SUMMARY"
+          test -n "$REPRO"
           test -f actionrepro-dogfood/reproduce.sh
           test -f actionrepro-dogfood/reproduce.ps1
           test -f actionrepro-dogfood/repro.json
           test -f actionrepro-dogfood/bundle.sha256
-          echo "out-dir=${{ steps.repro.outputs.out-dir }}"
-          echo "summary=${{ steps.repro.outputs.summary }}"
-          echo "repro=${{ steps.repro.outputs.repro-command }}"
+          echo "out-dir=$OUT_DIR"
+          echo "summary=$SUMMARY"
+          echo "repro=$REPRO"
       - name: Upload dogfood bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: actionrepro-dogfood-bundle
           path: actionrepro-dogfood/

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { ensureDir } from "../utils/fs.js";
 import { redactText } from "./redact.js";
 import { hashBundleFiles, FINGERPRINT_ALGO } from "./fingerprint.js";
@@ -67,13 +68,26 @@ export function psDq(s: string): string {
  * Display-only escaping for generated scripts: shell-safe AND neutralized
  * for CI-runner log parsers (`##[` would otherwise become a phantom workflow
  * command when the script's own output is shown in Actions logs).
+ * Newlines are collapsed first: metadata such as the source path is
+ * interpolated into `#` comment lines, where an embedded newline would break
+ * out of the comment and become an executable line (a filename can legally
+ * contain one).
  */
 function shText(s: string): string {
-  return shDq(s).replace(/##\[/g, "## [");
+  return shDq(s.replace(/[\r\n]+/g, " ")).replace(/##\[/g, "## [");
 }
 
 function psText(s: string): string {
-  return psDq(s).replace(/##\[/g, "## [");
+  return psDq(s.replace(/[\r\n]+/g, " ")).replace(/##\[/g, "## [");
+}
+
+/**
+ * Single-quote a string for shell copy-paste (the `act -j` hint): immune to
+ * `$()`, backticks, double quotes and history expansion. A hostile job name
+ * must paste literally, never execute.
+ */
+function shqDisplay(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`).replace(/!/g, `'\\!'`)}'`;
 }
 
 function installBlock(eco: EcosystemInfo): string {
@@ -168,6 +182,48 @@ export function hasRunnableCommand(cmd: string): boolean {
 export const EXIT_SETUP_FAILED = 3;
 export const EXIT_ABORTED = 4;
 export const EXIT_NO_COMMAND = 5;
+
+/** Content files covered by bundle.sha256 (repro.json excluded: it carries the hash). */
+export const INTEGRITY_FILES = [
+  "reproduce.sh",
+  "reproduce.ps1",
+  "failure.txt",
+  "environment.txt",
+] as const;
+
+export interface BundleIntegrity {
+  status: "ok" | "mismatch" | "unchecked";
+  expected?: string;
+  actual?: string;
+}
+
+/**
+ * Verify a bundle against its bundle.sha256. `verify` reports the status;
+ * a mismatch never changes the verdict (users legitimately edit the repro
+ * command), but it tells the reader the files differ from what the author
+ * created. This is tamper-evidence, not a signature: anyone holding the
+ * bundle directory can recompute the hash.
+ */
+export function checkBundleIntegrity(bundleDir: string): BundleIntegrity {
+  try {
+    const shaText = fs.readFileSync(path.join(bundleDir, "bundle.sha256"), "utf8");
+    const expected = shaText
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => /^[0-9a-f]{64}$/.test(l));
+    if (!expected) return { status: "unchecked" };
+    const files = INTEGRITY_FILES.map((name) => ({
+      name,
+      content: fs.readFileSync(path.join(bundleDir, name), "utf8"),
+    }));
+    const actual = hashBundleFiles(files);
+    return actual === expected
+      ? { status: "ok", expected, actual }
+      : { status: "mismatch", expected, actual };
+  } catch {
+    return { status: "unchecked" };
+  }
+}
 
 export function buildReproduceSh(input: BundleInput): string {
   const cmd = reproCommandFor(input.ecosystem, input.failure);
@@ -445,7 +501,7 @@ instead (services, caches, runner image), use
 [act](https://github.com/nektos/act) with this job:
 
 \`\`\`bash
-act -j "${meta.job.replace(/"/g, "'")}"
+act -j ${shqDisplay(meta.job)}
 \`\`\`
 `
     : ""
@@ -495,7 +551,7 @@ No Docker required. No telemetry. Secrets were redacted heuristically (${input.r
 - \`failure.txt\` — redacted failure excerpt + full error context
 - \`environment.txt\` — CI runner/runtime details
 - \`repro.json\` — machine-readable metadata (redacted)
-- \`bundle.sha256\` — integrity hash over the content files
+- \`bundle.sha256\` — tamper-evidence hash over the content files (\`verify\` reports it; not a signature)
 - \`README.md\` — this file
 `;
 }

@@ -186,15 +186,15 @@ Authentication notes (verified against the live GitHub API):
 
 ## What the bundle contains
 
-| File              | Purpose                                                                                                                                                                          |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reproduce.sh`    | Bash repro script (Linux/macOS/Termux/Git Bash), `chmod +x` ready                                                                                                                |
-| `reproduce.ps1`   | PowerShell repro script for Windows                                                                                                                                              |
-| `README.md`       | Human summary: source, failure, env, how to run                                                                                                                                  |
-| `failure.txt`     | Redacted failure excerpt + error context                                                                                                                                         |
-| `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint                                                                                                                            |
-| `repro.json`      | Machine-readable redacted metadata, including `generatedAt` (ISO time the bundle was written), `bundleSha256`, and `reproCommandSource` (log, CI workflow, or ecosystem default) |
-| `bundle.sha256`   | Integrity hash over the bundle content files                                                                                                                                     |
+| File              | Purpose                                                                                                                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reproduce.sh`    | Bash repro script (Linux/macOS/Termux/Git Bash), `chmod +x` ready                                                                                                                                                                                                                                 |
+| `reproduce.ps1`   | PowerShell repro script for Windows                                                                                                                                                                                                                                                               |
+| `README.md`       | Human summary: source, failure, env, how to run                                                                                                                                                                                                                                                   |
+| `failure.txt`     | Redacted failure excerpt + error context                                                                                                                                                                                                                                                          |
+| `environment.txt` | Runner OS/arch, Node/Python/Go/Rust versions, PM hint                                                                                                                                                                                                                                             |
+| `repro.json`      | Machine-readable redacted metadata, including `generatedAt` (ISO time the bundle was written), `bundleSha256`, and `reproCommandSource` (log, CI workflow, or ecosystem default)                                                                                                                  |
+| `bundle.sha256`   | Tamper-evidence hash over the four content files (`reproduce.sh`, `reproduce.ps1`, `failure.txt`, `environment.txt`); `verify` recomputes and reports it (`integrity: ok/mismatch/unchecked`) without changing the verdict — anyone holding the bundle can recompute it, so it is not a signature |
 
 Each bundle also records a **failure fingerprint** (stable hash of ecosystem,
 command, exit code, error kind, and the failure anchor line — the single most
@@ -336,10 +336,12 @@ and are never echoed; all outputs are secret-redacted best-effort.
 Every log line, summary, file, and error message passes through deterministic, pattern-based redaction before it is printed or written. It is best-effort, not a guarantee — always review a bundle before sharing:
 
 - `ghp_/gho_/ghu_/ghs_/ghr_`, `github_pat_`, `xox*`, `sk_live/test`, `AKIA…`
+- `glpat_/glrt_/glcbt_` (GitLab), `npm_…`, bare JWTs, `sk-…`, `AIza…`
+- Slack webhook URLs (host kept), Docker `"auth"` entries (key kept)
 - `Bearer …` / `Basic …`, `_authToken=…`, PEM private-key blocks
 - `password=…` / `token=…` / `api_key=…` style pairs (key name kept, value → `[REDACTED]`)
 - URL-embedded creds (`https://user:pass@host` → `https://[REDACTED]@host`)
-- Values of `GITHUB_TOKEN`, `NPM_TOKEN`, `AWS_SECRET_ACCESS_KEY`, `*_SECRET`, `*_PASSWORD`, etc.
+- Values of `GITHUB_TOKEN`, `GITLAB_TOKEN`, `NPM_TOKEN`, `AWS_SECRET_ACCESS_KEY`, `*_SECRET`, `*_PASSWORD`, etc.
 
 There is no tracking or telemetry. The only network calls are to `api.github.com`, and only when you pass a GitHub URL. See [SECURITY.md](SECURITY.md).
 

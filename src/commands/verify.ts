@@ -11,6 +11,7 @@ import {
   type VerifyVerdict,
 } from "../core/fingerprint.js";
 import { listCwdFiles } from "../utils/fs.js";
+import { checkBundleIntegrity } from "../core/bundle.js";
 
 export interface VerifyInput {
   bundleDir: string;
@@ -28,6 +29,8 @@ export interface VerifyResult {
   recordedSummary?: string;
   freshSummary?: string;
   reason: string;
+  /** bundle.sha256 check over the content files (see checkBundleIntegrity). */
+  integrity: "ok" | "mismatch" | "unchecked";
 }
 
 interface StoredMeta {
@@ -54,6 +57,7 @@ function inconclusive(
     freshExitCode: null,
     recordedSummary: meta.failure?.summary,
     reason,
+    integrity: checkBundleIntegrity(input.bundleDir).status,
     ...extra,
   };
 }
@@ -117,6 +121,13 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
   const lines = red.text.split(/\r?\n/);
   const failure = extractFailure(lines);
   const recordedExitCode = meta.failure?.exitCode ?? null;
+  const integrity = checkBundleIntegrity(input.bundleDir);
+  // A changed bundle is still verifiable (users edit the repro command on
+  // purpose), but the reader must be told the files differ from creation.
+  const integrityNote =
+    integrity.status === "mismatch"
+      ? " Bundle integrity: MISMATCH — files in the bundle directory differ from bundle.sha256 (modified after creation)."
+      : "";
 
   if (!failure.matched && failure.exitCode !== undefined && failure.exitCode !== 0) {
     // The command failed (non-zero exit) but printed no diagnostic we can
@@ -135,7 +146,9 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
       reason:
         `The fresh log shows a failing exit code (${failure.exitCode}) but no recognizable failure ` +
         "diagnostic, so it cannot be matched against the recorded failure. Inspect the output of the " +
-        "command, or make it print its error, then verify again.",
+        "command, or make it print its error, then verify again." +
+        integrityNote,
+      integrity: integrity.status,
     };
   }
 
@@ -154,7 +167,9 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
       freshSummary: undefined,
       reason:
         "The fresh log contains no failure evidence (no diagnostic line, and no runner exit marker) — " +
-        "the reproduced command did not fail. The CI failure did not reproduce.",
+        "the reproduced command did not fail. The CI failure did not reproduce." +
+        integrityNote,
+      integrity: integrity.status,
     };
   }
 
@@ -178,7 +193,8 @@ export async function verifyBundle(input: VerifyInput): Promise<VerifyResult> {
     freshExitCode: failure.exitCode ?? null,
     recordedSummary: meta.failure?.summary,
     freshSummary: failure.summary,
-    reason: cmp.reason,
+    reason: cmp.reason + integrityNote,
+    integrity: integrity.status,
   };
 }
 
@@ -194,6 +210,7 @@ export function formatVerifyHuman(r: VerifyResult): string {
     r.recordedSummary ? `  recorded: ${r.recordedSummary}` : null,
     r.freshSummary ? `  fresh: ${r.freshSummary}` : null,
     `  verdict: ${r.verdict}`,
+    `  integrity: ${r.integrity}${r.integrity === "mismatch" ? " (files differ from bundle.sha256)" : ""}`,
     `  reason: ${r.reason}`,
   ]
     .filter((x): x is string => x !== null)

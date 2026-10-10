@@ -60,3 +60,58 @@ describe("other redaction rules still hold", () => {
     expect(twice.redactions).toBe(0);
   });
 });
+
+describe("extended token formats (GitLab, npm, JWT, sk-, Google, Slack, docker)", () => {
+  // NOTE: secrets are assembled with repeat/concat so the checked-in file
+  // contains no literal scanner-matching credential (push protection).
+  // The regexes still see the full real shape at runtime.
+  const glpat = "glpat-" + "a1".repeat(10);
+  const glrt = "glrt-" + "b2".repeat(10);
+  const glcbt = "glcbt-" + "c3".repeat(10);
+  const npmt = "npm_" + "d4".repeat(13);
+  const jwt = ["eyJ" + "e".repeat(29), "f".repeat(24), "g".repeat(12)].join(".");
+  const sk = "sk-" + "h5".repeat(12);
+  const skant = "sk-ant-" + "j6".repeat(10);
+  const gkey = "AIza" + "G7".repeat(17) + "H";
+  const slackPath = "TAAA/BBBB/" + "x".repeat(24);
+  const dockb64 = "dXNl" + "cjpwYXNz";
+  it.each([
+    [`GITLAB_TOKEN=${glpat}`, glpat],
+    [`runner token ${glrt} here`, glrt],
+    [`token ${glcbt} here`, glcbt],
+    [`npm publish --//:_authToken=${npmt}`, npmt],
+    [`id_token=${jwt}`, jwt],
+    [`OPENAI_KEY=${sk}`, sk],
+    [`key ${skant} here`, skant],
+    [`maps key ${gkey} end`, gkey],
+    [`post https://hooks.slack.com/services/${slackPath} now`, "x".repeat(24)],
+    [`{"auths":{"r":{"auth":"${dockb64}"}}}`, dockb64],
+  ])("redacts the credential in %s", (line, secret) => {
+    const { text, redactions } = redactText(line);
+    expect(text).not.toContain(secret);
+    expect(redactions).toBeGreaterThan(0);
+  });
+
+  it("keeps the Slack webhook host for debuggability", () => {
+    const { text } = redactText(
+      "x https://hooks.slack.com/services/T/B/secret-seed-value-123 y",
+    );
+    expect(text).toContain("https://hooks.slack.com/services/[REDACTED]");
+  });
+
+  it("keeps the docker auth key name for debuggability", () => {
+    const { text } = redactText(`{"auth":"${dockb64}"}`);
+    expect(text).toContain('"auth":"[REDACTED]"');
+  });
+
+  it.each([
+    "task-123 failed, disk-space low",
+    "npm_foo is not defined",
+    '"auth": "ok"',
+    "saw eyJ.a.b in the docs",
+  ])("leaves lookalike prose untouched: %s", (line) => {
+    const { text, redactions } = redactText(line);
+    expect(text).toBe(line);
+    expect(redactions).toBe(0);
+  });
+});

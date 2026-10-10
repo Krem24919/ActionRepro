@@ -108,8 +108,23 @@ describe("createBundle", () => {
     const withJob = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-act-"));
     createBundle({ ...base, runMeta: { job: "test (20.x)" } }, withJob);
     const readme = fs.readFileSync(path.join(withJob, "README.md"), "utf8");
-    expect(readme).toContain('act -j "test (20.x)"');
+    expect(readme).toContain("act -j 'test (20.x)'");
     expect(readme).toContain("nektos/act");
+    // A hostile job name must paste literally: single-quoted, never executed.
+    const hostile = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-actx-"));
+    createBundle({ ...base, runMeta: { job: "evil$(touch pwned)`id`!ok" } }, hostile);
+    const hostileReadme = fs.readFileSync(path.join(hostile, "README.md"), "utf8");
+    const hint = hostileReadme.split("\n").find((l) => l.startsWith("act -j "));
+    expect(hint).toBe("act -j 'evil$(touch pwned)`id`'\\!'ok'");
+    // Embedded single quotes are closed, escaped, and reopened.
+    const quoted = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-actq-"));
+    createBundle({ ...base, runMeta: { job: "it's" } }, quoted);
+    const quotedReadme = fs.readFileSync(path.join(quoted, "README.md"), "utf8");
+    expect(quotedReadme.split("\n").find((l) => l.startsWith("act -j "))).toBe(
+      "act -j 'it'\\''s'",
+    );
+    fs.rmSync(hostile, { recursive: true, force: true });
+    fs.rmSync(quoted, { recursive: true, force: true });
     const noJob = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-noact-"));
     createBundle(base, noJob);
     expect(fs.readFileSync(path.join(noJob, "README.md"), "utf8")).not.toContain(
