@@ -394,7 +394,7 @@ CI dogfoods it on every push (`.github/workflows/dogfood.yml`).
 
 1. Normalize lines (strip ANSI + `2024-…Z` timestamps) and drop the bundle's own `==> [actionrepro]` frame.
 2. Score each line against weighted error patterns (tracebacks, `error[E…]`, `panic:`, `not ok N`, `ERR_PNPM_…`, `FAILED/FAIL`, `npm ERR!`, …). The runner's own restatements — `Process completed with exit code N`, `npm ERR! Exit status`/`code ELIFECYCLE`/`errno` — are bookkeeping: they supply the exit code and only become the anchor when nothing better matched. Highest weight wins; ties go to the last occurrence.
-3. Walk backwards for the nearest `Run <cmd>` / `$ <cmd>` (or `npm/pnpm/yarn/pytest/cargo/go` invocation) as the repro command.
+3. Walk backwards for the nearest `##[group]Run <cmd>` / `$ <cmd>` (or `npm/pnpm/yarn/pytest/cargo/go` invocation) as the repro command. A bare prose `Run ...` line is never trusted.
 4. Detect ecosystem from `Run …` lines + error signatures + local manifest names.
 5. Detect runtime versions from `setup-node/python/go`, `rustc`, `go version`, `Operating System:` lines.
 

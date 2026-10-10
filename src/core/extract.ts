@@ -166,7 +166,7 @@ const RUN_LINE_RES = [
  * 2. Score every line against weighted error patterns; the runner's
  *    exit-code restatements are bookkeeping and only win if nothing else did.
  * 3. Pick the highest-weight (last on ties) line as the failure anchor.
- * 4. Walk backwards for the nearest `Run <cmd>` / `$ <cmd>` as repro command.
+ * 4. Walk backwards for the nearest `##[group]Run <cmd>` / `$ <cmd>` as repro command.
  * 5. Parse the exit code from the marker nearest the anchor.
  */
 export function extractFailure(

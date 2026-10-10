@@ -84,10 +84,12 @@ function psText(s: string): string {
 /**
  * Single-quote a string for shell copy-paste (the `act -j` hint): immune to
  * `$()`, backticks, double quotes and history expansion. A hostile job name
- * must paste literally, never execute.
+ * must paste literally, never execute. Newlines collapse: a broken line in
+ * the hint would execute its tail on paste.
  */
 function shqDisplay(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`).replace(/!/g, `'\\!'`)}'`;
+  const flat = s.replace(/[\r\n]+/g, " ");
+  return `'${flat.replace(/'/g, `'\\''`).replace(/!/g, `'\\!'`)}'`;
 }
 
 function installBlock(eco: EcosystemInfo): string {

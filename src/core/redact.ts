@@ -55,14 +55,16 @@ const PATTERNS: RegExp[] = [
   /\bghs_[A-Za-z0-9]{20,}\b/g,
   /\bghr_[A-Za-z0-9]{20,}\b/g,
   /github_pat_[A-Za-z0-9_]{10,}/g,
-  // GitLab tokens (the tool reads GitLab pipelines, so its own PAT formats
-  // must be covered): glpat- personal/project/group tokens, glrt- runner
-  // tokens, glcbt- CI/build tokens. The prefixes never occur in prose.
+  // GitLab tokens (the tool reads GitLab pipelines, so GitLab-issued
+  // formats must be covered): glpat- personal/project/group tokens, glrt-
+  // runner tokens, glcbt- (reported CI/build token prefix). The prefixes
+  // never occur in prose, so covering them is free.
   /\bglpat-[A-Za-z0-9_-]{20,}/g,
   /\bglrt-[A-Za-z0-9_-]{20,}/g,
   /\bglcbt-[A-Za-z0-9_-]{20,}/g,
-  // npm granular access tokens (`npm_` + 36 chars). Short `npm_foo`
-  // identifiers in code are left alone by the length floor.
+  // npm granular access tokens (`npm_` + long secret; real ones are 36
+  // chars). Short `npm_foo` identifiers in code are left alone by the
+  // length floor.
   /\bnpm_[A-Za-z0-9]{20,}/g,
   // Bare JWTs (`eyJ` = base64 `{"`, three dot-separated segments). The
   // `Authorization: Bearer` form above already covers header use.

@@ -123,6 +123,17 @@ describe("createBundle", () => {
     expect(quotedReadme.split("\n").find((l) => l.startsWith("act -j "))).toBe(
       "act -j 'it'\\''s'",
     );
+    // Newlines collapse: a broken hint line would execute its tail on paste.
+    const nlJob = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-actn-"));
+    createBundle(
+      { ...base, runMeta: { job: `a${String.fromCharCode(10)}touch pwned` } },
+      nlJob,
+    );
+    const nlReadme = fs.readFileSync(path.join(nlJob, "README.md"), "utf8");
+    expect(nlReadme.split("\n").find((l) => l.startsWith("act -j "))).toBe(
+      "act -j 'a touch pwned'",
+    );
+    fs.rmSync(nlJob, { recursive: true, force: true });
     fs.rmSync(hostile, { recursive: true, force: true });
     fs.rmSync(quoted, { recursive: true, force: true });
     const noJob = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-noact-"));
