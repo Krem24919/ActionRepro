@@ -50,6 +50,7 @@ cat actionrepro/failure.txt
 - [Usage](#usage)
 - [What the bundle contains](#what-the-bundle-contains)
 - [Verifying a fix (`verify`)](#verifying-a-fix-verify)
+- [Exit codes](#exit-codes)
 - [Coding agents (MCP)](#coding-agents-mcp)
 - [Security: secret redaction](#security-secret-redaction)
 - [GitHub Action (optional, for other repos)](#github-action-optional-for-other-repos)
@@ -216,13 +217,13 @@ The script is ecosystem-aware:
 - `pip` → `pip install -r requirements.txt` then `pytest`
 - `uv` → `uv sync` then `uv run pytest`
 - `cargo` → `cargo fetch` then `cargo test`
-- `go` → `go mod download` then `` `go test ./...` ``
+- `go` → `go mod download` then `go test ./...`
 - `maven` → `mvn -B dependency:resolve` then `mvn -B test`
 - `gradle` → `./gradlew -q dependencies` then `./gradlew test`
 - `dotnet` → `dotnet restore` then `dotnet test`
 - `ruby` → `bundle install` then `bundle exec rspec`
 
-Scope: the bundle replays dependency install + the closest failing command with your user privileges. It does not check out any commit, and does not provide CI services, caches, artifacts, secrets, or matrix variables — a pass/fail here is best-effort evidence, not proof.`
+Scope: the bundle replays dependency install + the closest failing command with your user privileges. It does not check out any commit, and does not provide CI services, caches, artifacts, secrets, or matrix variables — a pass/fail here is best-effort evidence, not proof.
 
 ## Verifying a fix (`verify`)
 
@@ -328,8 +329,10 @@ which verifies, records history, and reports fixed / still-failing /
 changed-failure (`mark_fixed` when it stays green).
 `reproduce` defaults to files-only; pass `run: true` only with the user's
 explicit approval (MCP sessions are non-interactive, so the terminal
-confirmation gate is skipped there). Tokens go only to `api.github.com`
-and are never echoed; all outputs are secret-redacted best-effort.
+confirmation gate is skipped there). Tokens go only to the hosts you asked
+about (`api.github.com`, plus your `GH_HOST` Enterprise host or GitLab host
+when you use those features) and are never echoed; all outputs are
+secret-redacted best-effort.
 
 ## Security: secret redaction
 
@@ -343,7 +346,10 @@ Every log line, summary, file, and error message passes through deterministic, p
 - URL-embedded creds (`https://user:pass@host` → `https://[REDACTED]@host`)
 - Values of `GITHUB_TOKEN`, `GITLAB_TOKEN`, `NPM_TOKEN`, `AWS_SECRET_ACCESS_KEY`, `*_SECRET`, `*_PASSWORD`, etc.
 
-There is no tracking or telemetry. The only network calls are to `api.github.com`, and only when you pass a GitHub URL. See [SECURITY.md](SECURITY.md).
+There is no tracking or telemetry. Network calls go only to the CI hosts
+you ask about (`api.github.com`, your `GH_HOST` Enterprise host, your GitLab
+host, and the log-download host GitHub redirects to), and only when you pass
+a URL. See [SECURITY.md](SECURITY.md).
 
 ## GitHub Action (optional, for other repos)
 
@@ -371,13 +377,13 @@ jobs:
         with:
           node-version: 20
       - name: Build repro bundle (redacted)
-        uses: Krem24919/ActionRepro@main # temporary: pinned to a release tag once 0.1.0 ships
+        uses: Krem24919/ActionRepro@v0.1.1
         with:
           run-url: ${{ github.event.workflow_run.html_url }}
           out: actionrepro
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: actionrepro-bundle
           path: actionrepro/
@@ -414,10 +420,10 @@ src/
 test/unit/ test/integration/   # vitest, deterministic fixtures
 fixtures/logs/ fixtures/api/
 action.yml               # reusable composite action
-.github/workflows/      # ci.yml + release.yml
+.github/workflows/      # ci.yml + dogfood.yml + release.yml
 ```
 
-Adding a provider: implement `CiProvider` in `src/providers/` (`matches()` + `fetch()`). Adding an ecosystem: extend `detectEcosystem()` + `installBlock()` in `src/core/bundle.ts`. No backend changes needed — there is no backend.
+Adding a provider: implement `CiProvider` in `src/providers/` (`matches()` + `fetch()`). Adding an ecosystem: extend `detectEcosystem()` in `src/core/ecosystems.ts` + `installBlock()`/`psInstall()` in `src/core/bundle.ts`. No backend changes needed — there is no backend.
 
 ## Development
 
@@ -463,7 +469,7 @@ caches, artifacts, secrets, or matrix variables. Use `verify` as evidence
 (REPRODUCED / NOT_REPRODUCED), not proof.
 
 **Windows?**
-Use `reproduce.ps1`. It is checked by content and exit-code tests only: it has not been run on Windows in CI, so treat it as untested there. The generated scripts ask for confirmation on
+Use `reproduce.ps1`. It executes in Windows CI on every push (the `--run`/`prove` suites run it there), and content tests pin its structure. The generated scripts ask for confirmation on
 interactive terminals; set `CI_REPRO_YES=1` to skip it in automation.
 
 **How is this different from `act`?**
@@ -472,7 +478,7 @@ for testing workflow files; needs Docker). ActionRepro starts _after_ a
 failure: from a run URL it extracts the exact failed step, builds a
 shareable redacted bundle, and verifies the fix with fingerprints. They
 complement each other — every bundle with a known job even prints the exact
-`act -j "<job>"` fallback for environment-shaped failures.
+`act -j '<job>'` fallback for environment-shaped failures.
 
 ## License
 
