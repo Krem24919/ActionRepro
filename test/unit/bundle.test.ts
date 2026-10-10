@@ -134,3 +134,42 @@ describe("createBundle", () => {
     fs.rmSync(noJob, { recursive: true, force: true });
   });
 });
+
+describe("sourceDisplay sanitization (H1: newline breakout)", () => {
+  it("collapses newlines so metadata cannot add executable script lines", () => {
+    const NL = String.fromCharCode(10);
+    const raw = fx("npm-fail.log");
+    const red = redactText(raw);
+    const lines = red.text.split("\n");
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), "actionrepro-h1unit-"));
+    try {
+      createBundle(
+        {
+          sourceDisplay: `evil${NL}touch h1-pwned${NL}.log`,
+          ecosystem: detectEcosystem(lines),
+          runtime: detectRuntime(lines),
+          failure: extractFailure(lines),
+          redactedLogs: red.text,
+          redactions: red.redactions,
+          fingerprint: "test-fingerprint",
+        },
+        out,
+      );
+      for (const name of ["reproduce.sh", "reproduce.ps1"]) {
+        const text = fs.readFileSync(path.join(out, name), "utf8");
+        expect(
+          text.split("\n").some((l) => l.trim() === "touch h1-pwned"),
+          name,
+        ).toBe(false);
+      }
+      const sh = fs.readFileSync(path.join(out, "reproduce.sh"), "utf8");
+      const src = sh.split("\n").find((l) => l.startsWith("# Source:"));
+      expect(src).toBeDefined();
+      // Collapsed onto one inert comment line (still informative, unexecutable).
+      expect(src).toContain("evil");
+      expect(src).toContain(".log");
+    } finally {
+      fs.rmSync(out, { recursive: true, force: true });
+    }
+  });
+});
